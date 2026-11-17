@@ -17,12 +17,13 @@ import (
 )
 
 var (
-	once     sync.Once
-	engine   goldmark.Markdown
-	policy   *bluemonday.Policy
-	assetSRC = regexp.MustCompile(`^/assets/[A-Za-z0-9._~/-]+$`)
-	linkHref = regexp.MustCompile(`^(?:https?://|/|#)[^\s]*$`)
-	codeLang = regexp.MustCompile(`^language-[a-z0-9+#-]+$`)
+	once   sync.Once
+	engine goldmark.Markdown
+	policy *bluemonday.Policy
+	// 图片只允许站内路径：/assets/ 是前端构建产物，/media/ 是笔记配图。
+	localImageSRC = regexp.MustCompile(`^/(?:assets|media)/[A-Za-z0-9._~/-]+$`)
+	linkHref      = regexp.MustCompile(`^(?:https?://|/|#)[^\s]*$`)
+	codeLang      = regexp.MustCompile(`^language-[a-z0-9+#-]+$`)
 )
 
 func setup() {
@@ -45,8 +46,8 @@ func setup() {
 	p.AllowAttrs("href").Matching(linkHref).OnElements("a")
 	p.AllowAttrs("title").OnElements("a")
 	p.AllowAttrs("align").OnElements("th", "td")
-	// 图片只允许站内 /assets/ 路径，避免外链图片与追踪像素。
-	p.AllowAttrs("src").Matching(assetSRC).OnElements("img")
+	// 图片只允许站内路径，避免外链图片与追踪像素。
+	p.AllowAttrs("src").Matching(localImageSRC).OnElements("img")
 	p.AllowAttrs("alt", "title").OnElements("img")
 	p.AllowAttrs("class").Matching(codeLang).OnElements("code")
 	p.RequireNoFollowOnLinks(true)

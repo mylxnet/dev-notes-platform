@@ -29,14 +29,18 @@ func TestMarkdownDropsJavascriptLink(t *testing.T) {
 }
 
 func TestMarkdownAllowsOnlyInternalImages(t *testing.T) {
-	internal := Markdown("![图](/assets/demo.png)")
-	if !strings.Contains(internal, "/assets/demo.png") {
-		t.Fatalf("expected internal image kept, got %q", internal)
+	for _, source := range []string{"/assets/demo.png", "/media/siteguard-arch.svg"} {
+		out := Markdown("![图](" + source + ")")
+		if !strings.Contains(out, source) {
+			t.Fatalf("expected %s kept, got %q", source, out)
+		}
 	}
 
-	external := Markdown("![图](https://evil.example/track.gif)")
-	if strings.Contains(external, "evil.example") {
-		t.Fatalf("external image should be removed, got %q", external)
+	for _, source := range []string{"https://evil.example/track.gif", "//cdn.example/a.png", "/static/a.png"} {
+		out := Markdown("![图](" + source + ")")
+		if strings.Contains(out, source) {
+			t.Fatalf("image %s should be removed, got %q", source, out)
+		}
 	}
 }
 

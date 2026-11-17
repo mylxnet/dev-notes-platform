@@ -1,10 +1,29 @@
 # 项目状态 · 我的开发笔记
 
-> v1.2.0 · by Mr lin · 2026-11-17
+> v1.3.0 · by Mr lin · 2026-11-17
 
 ## 当前版本
 
-v1.2.0 · Section 3 已完成：后台管理与认证、内容前置校验、Markdown 渲染净化、前台正文改为服务端渲染；下一阶段 Section 4（真实内容录入）。
+v1.3.0 · Section 3 已完成：后台管理与认证、内容前置校验、Markdown 渲染净化、前台正文改为服务端渲染；本轮补充站内配图通道（`/media/`）与两张技术插图。下一阶段 Section 4（真实内容录入）。
+
+## 本轮改动记录（v1.3.0，2026-11-17）
+
+- 图片白名单放宽：`render.go` 中 `assetSRC`（`^/assets/`）改为 `localImageSRC`（`^/(?:assets|media)/`），`AllowRelativeURLs(true)` 保持不变，外链与协议相对地址仍被剔除。
+- 新增 `web/public/media/siteguard-origin.svg`、`web/public/media/mailhub-imap-cursor.svg`，随 `public/` 进入 `dist/`，由 `noRouteHandler` 的静态分支直接下发（`http.FileServer` 按扩展名给出 `image/svg+xml`）。
+- `.article-markdown img` 增加 `display: block`、`height: auto`、`margin: 24px auto`，解决 SVG 自带宽高属性被压扁的问题。
+- `render_test.go` 图片用例改为表驱动：正例 `/assets/demo.png`、`/media/siteguard-arch.svg`；反例 `https://evil.example/track.gif`、`//cdn.example/a.png`、`/static/a.png`。
+
+### 验收证据（v1.3.0，2026-11-17）
+
+- `go test ./internal/render/... -count=1`：7 个用例全绿（含表驱动的内部图片用例）。
+- `go vet ./...` 无输出；`go test ./... -count=1` 全仓通过；`go test ./internal/auth/... -count=30` 稳定通过（排除篡改用例的偶发失败）。
+- `bash scripts/build.sh`：版本一致性校验通过，前端 63 个模块构建成功，`app/build/dev-notes` 产出（v1.3.0），`dist/media/` 内含两张 SVG。
+- 接口冒烟（临时库 + `:18081`）：`/healthz` 返回 `{"db":"ok","status":"ok","version":"1.3.0"}`；`/media/mailhub-imap-cursor.svg` 返回 `200 image/svg+xml`（3280 字节）；正文净化结果保留 `<img src="/media/mailhub-imap-cursor.svg">`，外链图片 `src` 被剔除。
+- 浏览器验收（Playwright + WSL 内 Chromium）：1280px 下插图渲染 719.2×299.4（比例 2.402，与原始 860×358 一致）；390px 下渲染 358.0×149.0（比例仍为 2.402），未被压扁。
+- 页脚遮挡复检：桌面页脚「v1.3.0 by Mr lin」矩形 `[991,847,1098,870]` 与主题按钮 `[1152,840,1260,880]` 不重叠；390px 下版本行 `y=801–824` 与按钮 `y=840–880` 不重叠。
+- 两张 SVG 已按同一视觉规范重绘：860 宽、白底圆角卡片、`#d97757` 强调色、`hot`/`ok` 区分陷阱与解法。
+
+**待办**：两张插图尚未被文章正文引用（正文在数据库里，仓库无 Markdown 源文件），需在录入文章时补 `![说明](/media/xxx.svg)`。
 
 ## Section 3 实施记录（2026-11-17）
 
@@ -117,12 +136,13 @@ v1.2.0 · Section 3 已完成：后台管理与认证、内容前置校验、Mar
 - SuperClip-C、LanFileShare 的许可证限制分发，站点只能放源码外链
 - 前台无评论、无访问统计（方案 A 范围外）
 - 第二版原型仅归档，不参与正式构建；是否删除待确认
-- 后台编辑器为纯文本框 + 预览，暂无工具栏、快捷键与图片上传（图片只能用 `/assets/` 站内路径）
+- 后台编辑器为纯文本框 + 预览，暂无工具栏、快捷键与图片上传（图片只能用手写站内路径 `/assets/` 或 `/media/`）
 - 登录限流计数存活于内存，多实例部署时各实例独立计数
 - 文章 slug 需手填，未做中文标题自动转拼音
 - Dockerfile、Compose 与 1Panel 部署尚未实现
 - 6 个项目的真实 GitHub 地址、5 篇笔记的真实内容尚未最终确认
 - 原型与构建复用了 `lxsyzd` WSL，未建项目专属隔离环境
+- 插图固定 860 宽、白底深字，暗色主题下呈白色卡片；390px 下缩到约 358px，图内小字偏小，暂未做暗色适配与移动端简化版
 
 ## 踩坑记录
 
@@ -140,15 +160,20 @@ v1.2.0 · Section 3 已完成：后台管理与认证、内容前置校验、Mar
 | bluemonday 净化后站内图片 `src` 被清空 | 该库默认不允许相对 URL | 调用 `p.AllowRelativeURLs(true)`，同时用 `Matching` 限定 `^/assets/` | 净化库的默认策略要逐条验证，不能只看元素白名单 |
 | Windows 侧 `127.0.0.1:18080` 连接被拒，WSL 内 `curl` 正常 | WSL2 localhost 转发在重启实例后失效 | 改用 WSL 网卡 IP（`hostname -I`）访问 | 本机验收失败时先用 WSL 内 `curl` 排除服务问题，再怀疑端口转发 |
 | 后台导航指向 `/admin/notes` 但该路由未定义，点击后被重定向首页 | 路由只加了登录页，缺子路由 | 一次性补齐后台全部子路由后再联调 | 导航项与路由必须同批交付，避免出现「点了没反应」 |
+| 正文里 `/media/xxx.svg` 的图片被净化后 `src` 清空 | 图片白名单仍是 `^/assets/`，`/media/` 不在允许目录内 | 白名单放宽为 `^/(?:assets|media)/`，测试补 `/media/` 正例 | 新增资源目录时要同步检查净化白名单与静态下发两处，只加文件不改白名单等于没生效 |
+| 正文 SVG 插图在窄容器下被压扁变形 | SVG 自带 `width`/`height` 属性，CSS 只写 `max-width: 100%` 不会让高度自适应 | 补 `display: block` 与 `height: auto` | 替换元素（img/svg）缩放宽度的同时必须显式放开高度，否则比例丢失 |
+| 页脚「v1.3.0 by Mr lin」被右下角主题按钮压住 | 主题按钮 `position: fixed`，页脚没有为它预留空间 | 页脚右内边距留 132px，≤600px 改为底部留白 76px | 固定定位元素会覆盖正常流内容，页脚类区域必须预留避让空间 |
+| `TestParseRejectsTamperedSession` 时好时坏 | 用例改写 base64url 末位字符，末位含未使用位，解码后字节可能完全相同，篡改等于没改 | 改为改写签名段首字符，保证解码字节必变 | 校验签名的用例不能靠「改一个字符」想当然，要确认改动真的改变了字节 |
 
 ## 待办清单
 
 1. 确认 mailhub 正确仓库地址，或决定移除
 2. 确认 6 个项目的真实 GitHub 地址与许可证状态
 3. 确认 5 篇笔记的真实内容来源
-4. Section 4：真实内容录入
-5. Section 5：Docker + 1Panel 部署 + 浏览器验收
-6. 每个 Section 完成后升小版本、同步文档并提交
+4. 录入文章时为 `siteguard-origin.svg`、`mailhub-imap-cursor.svg` 补正文引用
+5. Section 4：真实内容录入
+6. Section 5：Docker + 1Panel 部署 + 浏览器验收
+7. 每个 Section 完成后升小版本、同步文档并提交
 
 ## 版本一致性检查
 
@@ -156,10 +181,10 @@ v1.2.0 · Section 3 已完成：后台管理与认证、内容前置校验、Mar
 
 | 位置 | 当前值 |
 |---|---|
-| `app/VERSION` / `app/main.go` | `1.2.0` |
-| `web/package.json` / `web/package-lock.json` | `1.2.0` |
-| `web/src/components/SiteFooter.vue` / 后台侧栏 / 登录页 | `v1.2.0 by Mr lin` |
-| `doc/*.md` / `README.md` / `CHANGELOG.md` | `v1.2.0` |
+| `app/VERSION` / `app/main.go` | `1.3.0` |
+| `web/package.json` / `web/package-lock.json` | `1.3.0` |
+| `web/src/components/SiteFooter.vue` / 后台侧栏 / 登录页 | `v1.3.0 by Mr lin` |
+| `doc/*.md` / `README.md` / `CHANGELOG.md` | `v1.3.0` |
 
 `scripts/build.sh` 在编译前校验 `app/main.go` 的 `var version` 与 `app/VERSION` 一致，不一致直接失败。原型工程 `prototype/` 仍为 `v1.0.3`，作为冻结基线不再跟随版本。
 

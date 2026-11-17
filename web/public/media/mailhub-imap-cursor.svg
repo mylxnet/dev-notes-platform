@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 358" width="860" height="358" role="img" aria-label="IMAP 星号范围与 UID 游标边界导致的误报新邮件">
+  <style>
+    .bg { fill: #ffffff; }
+    .box { fill: #faf9f5; stroke: #e8e6dc; stroke-width: 1.5; }
+    .hot { fill: rgba(180, 72, 62, 0.08); stroke: #c98d86; stroke-width: 1.5; }
+    .ok { fill: rgba(120, 140, 93, 0.12); stroke: #a7bd8c; stroke-width: 1.5; }
+    .t { font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; font-size: 14px; font-weight: 600; fill: #141413; }
+    .s { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 11.5px; fill: #6b6b63; }
+    .m { font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; font-size: 12px; fill: #6b6b63; }
+    .bad { fill: #a83f36; font-weight: 700; }
+    .good { fill: #5f7449; font-weight: 700; }
+    .cell { fill: #ffffff; stroke: #d8d6cc; stroke-width: 1.2; }
+    .newc { fill: rgba(120, 140, 93, 0.18); stroke: #a7bd8c; stroke-width: 1.2; }
+  </style>
+
+  <rect class="bg" x="0" y="0" width="860" height="358" rx="14"/>
+  <text class="t" x="28" y="34">mailhub · IMAP UID 游标：什么时候会误报「收到新邮件」</text>
+
+  <text class="m" x="28" y="64">邮箱里已有的 UID（左旧右新）；最新一封是 101，所以 uidNext = 102</text>
+  <g>
+    <rect class="cell" x="30" y="76" width="62" height="34" rx="6"/><text class="s" x="52" y="98">97</text>
+    <rect class="cell" x="100" y="76" width="62" height="34" rx="6"/><text class="s" x="119" y="98">98</text>
+    <rect class="cell" x="170" y="76" width="62" height="34" rx="6"/><text class="s" x="189" y="98">99</text>
+    <rect class="cell" x="240" y="76" width="62" height="34" rx="6"/><text class="s" x="259" y="98">100</text>
+    <rect class="newc" x="310" y="76" width="62" height="34" rx="6"/><text class="s" x="330" y="98">101</text>
+  </g>
+  <text class="m" x="392" y="98">← 101 已存在，不是新邮件</text>
+
+  <rect class="ok" x="26" y="132" width="390" height="96" rx="10"/>
+  <text class="good" x="44" y="156">正确：游标 100，取 101:*</text>
+  <text class="s" x="44" y="178">→ 服务端返回 101，added = 1</text>
+  <text class="m" x="44" y="200">守卫 uid &gt; cursor（101 &gt; 100）成立，之后把游标推到 101。</text>
+
+  <rect class="hot" x="444" y="132" width="390" height="96" rx="10"/>
+  <text class="bad" x="462" y="156">陷阱：游标已到 101，下一轮取 102:*</text>
+  <text class="s" x="462" y="178">→ 星号折回最大值，仍返回 101（旧的那封）</text>
+  <text class="m" x="462" y="200">守卫若写成 uid &gt;= cursor 就会放行，每轮多算 1 封。</text>
+
+  <rect class="box" x="26" y="244" width="808" height="96" rx="10"/>
+  <text class="t" x="44" y="268">星号不是「从这封往后」，而是「邮箱当前最大 UID」</text>
+  <text class="m" x="44" y="290">IMAP range 两端顺序无关，10:* 与 *:10 等价；起点超过最大值时会被折回来，所以 102:* 命中的还是 101。</text>
+  <text class="m" x="44" y="312">另外 added 只能表示「本次新建 Message 的条数」，不能把已有邮件算进去 —— 通知层对 new_mail 没有去重。</text>
+</svg>

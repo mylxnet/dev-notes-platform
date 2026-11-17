@@ -65,11 +65,20 @@ func TestParseRejectsTamperedSession(t *testing.T) {
 	}
 
 	for i := range cookies {
-		if cookies[i].Name == SessionCookie {
-			value := cookies[i].Value
-			// 改掉签名部分的一个字符
-			cookies[i].Value = value[:len(value)-1] + "A"
+		if cookies[i].Name != SessionCookie {
+			continue
 		}
+		// 改签名首字符，保证解码后的字节必然不同；末位字符可能只占半个字节，
+		// base64 解码会忽略未使用的尾位，改它等于没改。
+		parts := strings.SplitN(cookies[i].Value, ".", 2)
+		if len(parts) != 2 || parts[1] == "" {
+			t.Fatalf("unexpected cookie value: %q", cookies[i].Value)
+		}
+		head := "A"
+		if parts[1][0] == 'A' {
+			head = "B"
+		}
+		cookies[i].Value = parts[0] + "." + head + parts[1][1:]
 	}
 
 	c, _ := newContext(cookies)

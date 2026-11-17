@@ -7,7 +7,7 @@
 [![Backend](https://img.shields.io/badge/Backend-Go%201.27%20%2B%20Gin-00ADD8?logo=go&logoColor=white)](https://go.dev/)
 [![Frontend](https://img.shields.io/badge/Frontend-Vue%203%20%2B%20Vite%206-42b883?logo=vuedotjs&logoColor=white)](https://vuejs.org/)
 [![Database](https://img.shields.io/badge/Database-SQLite-003B57?logo=sqlite&logoColor=white)](https://www.sqlite.org/)
-[![Version](https://img.shields.io/badge/Version-1.2.0-d97757)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.3.0-d97757)](CHANGELOG.md)
 [![Deploy](https://img.shields.io/badge/Deploy-Docker%20%2B%201Panel-2496ED?logo=docker&logoColor=white)](doc/DEPLOY.md)
 
 [English](#english) | [中文](#中文)
@@ -147,6 +147,7 @@ dev-notes-platform/
 │   ├── src/views/         五个前台页面
 │   ├── src/views/admin/   登录、布局、笔记/项目管理、账号设置
 │   ├── src/components/    通用组件
+│   ├── public/media/      文章插图（SVG），构建时原样进产物
 │   └── vite.config.ts     产物输出到 app/internal/webui/dist
 ├── prototype/             已确认的第一版界面原型（冻结基线）
 ├── prototype-v2/          第二版候选（归档，不参与构建）
@@ -168,6 +169,7 @@ dev-notes-platform/
 | 进入后台 | 右上角「后台管理」，或直接访问 `/admin` |
 | 新建/编辑笔记 | 后台「笔记管理」→「新建笔记」，或行内「编辑」 |
 | 预览 Markdown | 编辑页点「预览」，走服务端渲染管线 |
+| 给文章插插图 | 图片放 `web/public/media/`，正文写 `![说明](/media/文件名.svg)` |
 | 修改密码 | 后台「账号设置」，当前页面会自动续期 |
 | 构建可交付二进制 | `bash scripts/build.sh` |
 | 跑后端测试 | `cd app && go test ./... -count=1` |
@@ -186,12 +188,12 @@ dev-notes-platform/
 | 登录提示「失败次数过多」 | 连续 5 次密码错误会锁定 15 分钟，等待或重启进程（计数在内存中） |
 | 保存提示「请求校验失败」 | CSRF token 过期，刷新页面后重新提交 |
 | 保存被拒绝且列出命中词 | 内容含经营性词汇或下载类表述，按提示改为「源码仓库」等合规表述 |
-| 正文里的图片不显示 | 只允许 `/assets/` 站内路径，外链图片会被净化移除 |
+| 正文里的图片不显示 | 只允许 `/assets/`（前端产物）与 `/media/`（文章插图）站内路径，外链图片会被净化移除 |
 | 项目卡片显示 0 篇关联笔记 | 该项目的笔记尚未发布；`note_count` 只统计 `published` |
 
 ### 📜 更新日志
 
-当前版本 **v1.2.0**（Section 3：后台管理与认证、内容前置校验、Markdown 渲染净化）。
+当前版本 **v1.3.0**（Section 3：后台管理与认证、内容前置校验、Markdown 渲染净化；本轮新增站内配图目录与两张技术插图）。
 
 逐版本明细详见 [CHANGELOG.md](CHANGELOG.md)。
 

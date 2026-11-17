@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 330" width="860" height="330" role="img" aria-label="网关反代下 Origin 与 Host 不一致导致同源校验失败">
+  <style>
+    .bg { fill: #ffffff; }
+    .box { fill: #faf9f5; stroke: #e8e6dc; stroke-width: 1.5; }
+    .hot { fill: rgba(180, 72, 62, 0.08); stroke: #c98d86; stroke-width: 1.5; }
+    .ok { fill: rgba(120, 140, 93, 0.12); stroke: #a7bd8c; stroke-width: 1.5; }
+    .t { font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; font-size: 14px; font-weight: 600; fill: #141413; }
+    .s { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 11.5px; fill: #6b6b63; }
+    .m { font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; font-size: 12px; fill: #6b6b63; }
+    .bad { fill: #a83f36; font-weight: 700; }
+    .good { fill: #5f7449; font-weight: 700; }
+    .line { stroke: #b0aea5; stroke-width: 1.5; fill: none; }
+  </style>
+
+  <rect class="bg" x="0" y="0" width="860" height="330" rx="14"/>
+  <text class="t" x="28" y="34">SiteGuard · 网关反代下的同源判定</text>
+
+  <rect class="box" x="26" y="56" width="200" height="76" rx="10"/>
+  <text class="t" x="42" y="80">浏览器</text>
+  <text class="s" x="42" y="100">Origin:</text>
+  <text class="s" x="42" y="118">http://nas.local:5666</text>
+
+  <rect class="box" x="326" y="56" width="208" height="76" rx="10"/>
+  <text class="t" x="342" y="80">飞牛网关</text>
+  <text class="s" x="342" y="100">改写 Host 后转发</text>
+  <text class="s" x="342" y="118">→ Unix Socket</text>
+
+  <rect class="box" x="632" y="56" width="202" height="76" rx="10"/>
+  <text class="t" x="648" y="80">SiteGuard</text>
+  <text class="s" x="648" y="100">Host: localhost</text>
+  <text class="s" x="648" y="118">(反代写入)</text>
+
+  <path class="line" d="M226 94 H320" marker-end="url(#a)"/>
+  <path class="line" d="M534 94 H626" marker-end="url(#a)"/>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#b0aea5"/>
+    </marker>
+  </defs>
+
+  <rect class="hot" x="26" y="156" width="808" height="58" rx="10"/>
+  <text class="bad" x="44" y="180">严格比对 Origin 与 Host：必然 403</text>
+  <text class="m" x="44" y="200">浏览器发的是 NAS 地址，服务端看到的是转发后的 localhost，两个值天然对不上；本地直连时两者同源，所以一直测不出来。</text>
+
+  <rect class="ok" x="26" y="228" width="808" height="78" rx="10"/>
+  <text class="good" x="44" y="252">解法：前端每个请求带自定义头 x-siteguard-client: 1</text>
+  <text class="m" x="44" y="272">服务端见到该头即视为同源；跨站表单无法伪造该头，跨站 fetch 加头会触发预检。</text>
+  <text class="m" x="44" y="292">缺头时仍走严格校验 —— 放宽的是可验证场景，不是关掉检查。</text>
+</svg>

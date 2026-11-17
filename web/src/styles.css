@@ -578,6 +578,8 @@ h2 {
   justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
+  /* 右下角固定的主题按钮会压住最后一列，预留它的宽度，保证版本号与署名可见。 */
+  padding-right: 132px;
 }
 
 .theme-float {
@@ -693,7 +695,11 @@ h2 {
 }
 
 .article-markdown img {
+  display: block;
   max-width: 100%;
+  /* SVG 插图自带 width/height 属性，只限宽不留 auto 会压扁比例。 */
+  height: auto;
+  margin: 24px auto;
   border-radius: 12px;
 }
 
@@ -1127,6 +1133,15 @@ tbody tr:hover {
   th,
   td {
     padding: 11px 10px;
+  }
+
+  .footer-inner {
+    padding-right: 0;
+  }
+
+  /* 窄屏版本行会换到末行，改为底部留白避开固定按钮。 */
+  .site-footer {
+    padding-bottom: 76px;
   }
 }
 

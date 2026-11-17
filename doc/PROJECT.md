@@ -1,8 +1,8 @@
 # 技术方案 · 我的开发笔记
 
-> v1.2.0 · by Mr lin · 2026-11-17
+> v1.3.0 · by Mr lin · 2026-11-17
 >
-> 依据：`doc/DESIGN.md` v1.2.0、已确认的 `prototype/` 第一版界面。本文档是后续编码、测试、部署的实施依据，代码实现与本文档不一致时，以本文档评审结论为准。
+> 依据：`doc/DESIGN.md` v1.3.0、已确认的 `prototype/` 第一版界面。本文档是后续编码、测试、部署的实施依据，代码实现与本文档不一致时，以本文档评审结论为准。
 
 ## 一、方案目标与范围
 
@@ -345,11 +345,11 @@ Markdown 渲染管线：
 
 1. `goldmark` 解析，禁用原始 HTML。
 2. 链接协议白名单：`http`、`https`。
-3. 图片仅允许站内相对路径 `/assets/`，不允许外链图片。
+3. 图片仅允许站内相对路径 `/assets/`（前端构建产物）与 `/media/`（文章插图），不允许外链图片。
 4. `bluemonday` 按白名单净化，移除 `script`、`iframe`、`style`、事件属性。
 5. 输出 HTML 存入响应字段 `content_html`，前端仅对净化后的 HTML 使用 `v-html`。
 
-v1.2.0 实现位置：字段规则与词汇拦截在 `internal/validate`，渲染管线在 `internal/render`。要点：① 未启用 `html.WithUnsafe()`，Markdown 中的原始 HTML 被丢弃；② `bluemonday` 使用 `NewPolicy()` 手写白名单，必须调用 `AllowRelativeURLs(true)`，否则 `/assets/` 图片与站内链接会被清空；③ 图片 `src` 用正则限定 `^/assets/`，外链图片（含追踪像素）会被移除；④ 代码块 `class="language-*"` 单独放行，其余 class 丢弃；⑤ 预览接口与管理端保存走同一渲染函数，避免预览与实际不一致。
+v1.3.0 实现位置：字段规则与词汇拦截在 `internal/validate`，渲染管线在 `internal/render`。要点：① 未启用 `html.WithUnsafe()`，Markdown 中的原始 HTML 被丢弃；② `bluemonday` 使用 `NewPolicy()` 手写白名单，必须调用 `AllowRelativeURLs(true)`，否则站内图片与相对链接会被清空；③ 图片 `src` 用正则 `^/(?:assets|media)/` 限定，外链、协议相对地址（`//cdn.example/a.png`）与未授权目录（`/static/`）会被移除；④ 代码块 `class="language-*"` 单独放行，其余 class 丢弃；⑤ 预览接口与管理端保存走同一渲染函数，避免预览与实际不一致；⑥ 正文插图存放于 `web/public/media/`，构建时原样进入 `dist/`，由 `noRouteHandler` 静态分支下发。
 
 ### 5.9 API 契约
 
@@ -441,7 +441,7 @@ v1.2.0 实现位置：字段规则与词汇拦截在 `internal/validate`，渲�
 
 - 结构化 JSON 日志：`time`、`level`、`request_id`、`method`、`path`、`status`、`latency_ms`。
 - 不记录密码、Cookie、CSRF Token、完整请求体。
-- `GET /healthz` 返回 `{"status":"ok","db":"ok","version":"1.2.0"}`，数据库不可用时返回 503。
+- `GET /healthz` 返回 `{"status":"ok","db":"ok","version":"1.3.0"}`，数据库不可用时返回 503。
 
 ### 5.12 错误处理原则
 
@@ -512,7 +512,7 @@ v1.2.0 实现位置：字段规则与词汇拦截在 `internal/validate`，渲�
 | 动效 | 仅 `transform` / `opacity`；150–300ms；尊重 `prefers-reduced-motion` |
 | 状态 | 每个列表必须提供加载、空、错误三态 |
 | 反馈 | 保存按钮提交中禁用并显示“保存中”；删除必须二次确认 |
-| 版本 | 页脚、后台侧栏与登录页显示 `v1.2.0 by Mr lin`，版本号在署名之前 |
+| 版本 | 页脚、后台侧栏与登录页显示 `v1.3.0 by Mr lin`，版本号在署名之前 |
 
 ### 6.5 后台交互
 
@@ -551,7 +551,7 @@ v1.2.0 实现位置：字段规则与词汇拦截在 `internal/validate`，渲�
 
 ### 7.2 构建脚本
 
-`scripts/build.sh` 步骤（v1.2.0 已实现前 4 步，镜像打包在 Section 5 补入）：
+`scripts/build.sh` 步骤（至 v1.3.0 已实现前 4 步，镜像打包在 Section 5 补入）：
 
 1. 读取版本号：`app/VERSION`。
 2. 版本一致性校验：`app/main.go` 的 `var version` 必须与 `app/VERSION` 相同，否则立即失败。
@@ -598,7 +598,7 @@ ENTRYPOINT ["/app/dev-notes"]
 ```yaml
 services:
   dev-notes:
-    image: dev-notes:1.2.0
+    image: dev-notes:1.3.0
     container_name: dev-notes
     restart: unless-stopped
     ports:
@@ -750,6 +750,8 @@ v1.2.0 已执行（2026-11-17，Playwright + 本机 Chrome，通过 WSL 实例 I
 
 v1.2.0 已由单元/接口测试覆盖：`<script>` 与 `onerror` 被净化、`javascript:` 链接被移除、外链图片被移除、未登录访问管理接口 401、缺少 `X-CSRF-Token` 返回 403、改密后旧 Cookie 401、登录连续 5 次失败后 429。跨站表单与 Origin 校验、Cookie 属性检查列入 Section 5 部署后验证。
 
+v1.3.0 补充图片通道用例：`/assets/demo.png` 与 `/media/siteguard-arch.svg` 保留；`https://evil.example/track.gif`、`//cdn.example/a.png`、`/static/a.png` 一律剔除。
+
 ### 8.6 部署测试
 
 1. `docker compose up -d` 后 `/healthz` 返回 200。
@@ -806,6 +808,7 @@ v1.2.0 已由单元/接口测试覆盖：`<script>` 与 `onerror` 被净化、`j
 
 | 版本 | 日期 | 变更 |
 |---|---|---|
+| v1.3.0 | 2026-11-17 | 新增站内配图目录 `/media/`：图片白名单放宽至 `/assets/` 与 `/media/`；正文图片改为等比自适应；新增两张技术插图（SiteGuard 同源判定、mailhub IMAP 游标） |
 | v1.2.0 | 2026-11-17 | 完成 Section 3：后台管理与认证、CSRF、登录限流、内容前置校验、Markdown 渲染净化、前台正文服务端渲染 |
 | v1.1.0 | 2026-11-17 | 完成 Section 2：正式前台接入真实 API、history 路由与 SPA 回退、静态资源 embed、构建脚本与浏览器验收 |
 | v1.0.3 | 2026-11-17 | 完成 Section 1：Go 骨架、SQLite 迁移、数据模型、Store、公开 API、健康检查与测试 |
