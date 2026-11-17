@@ -23,7 +23,7 @@ function onLogout() {
         <RouterLink to="/admin/account">账号设置</RouterLink>
       </nav>
       <div class="admin-side-note">
-        v1.0.2 by Mr lin<br />
+        v1.0.3 by Mr lin<br />
         单管理员账号 · 不开放注册
       </div>
     </aside>

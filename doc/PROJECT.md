@@ -1,8 +1,8 @@
 # 技术方案 · 我的开发笔记
 
-> v1.0.2 · by Mr lin · 2026-11-17
+> v1.0.3 · by Mr lin · 2026-11-17
 >
-> 依据：`doc/DESIGN.md` v1.0.2、已确认的 `prototype/` 第一版界面。本文档是后续编码、测试、部署的实施依据，代码实现与本文档不一致时，以本文档评审结论为准。
+> 依据：`doc/DESIGN.md` v1.0.3、已确认的 `prototype/` 第一版界面。本文档是后续编码、测试、部署的实施依据，代码实现与本文档不一致时，以本文档评审结论为准。
 
 ## 一、方案目标与范围
 
@@ -42,6 +42,16 @@
 | A6 | 桌面 1440px、移动 390px 无横向溢出 | 浏览器测试 |
 | A7 | 控制台 0 错误、0 警告 | 浏览器测试 |
 | A8 | 版本号在项目文件、界面、文档三处一致 | 发布前检查 |
+
+### 1.5 实施进度
+
+| Section | 状态 | 说明 |
+|---|---|---|
+| Section 1 | 已完成（2026-11-17） | Go 模块、配置、SQLite 迁移、数据模型、Store、公开 API、健康检查、单元与接口测试 |
+| Section 2 | 待开始 | 前台正式页面、embed 静态资源 |
+| Section 3 | 待开始 | 后台登录、管理 API、认证、前置校验 |
+| Section 4 | 待开始 | 真实内容录入 |
+| Section 5 | 待开始 | Docker、1Panel、端到端验收 |
 
 ## 二、总体架构
 
@@ -424,7 +434,7 @@ Markdown 渲染管线：
 
 - 结构化 JSON 日志：`time`、`level`、`request_id`、`method`、`path`、`status`、`latency_ms`。
 - 不记录密码、Cookie、CSRF Token、完整请求体。
-- `GET /healthz` 返回 `{"status":"ok","db":"ok","version":"1.0.2"}`，数据库不可用时返回 503。
+- `GET /healthz` 返回 `{"status":"ok","db":"ok","version":"1.0.3"}`，数据库不可用时返回 503。
 
 ### 5.12 错误处理原则
 
@@ -490,7 +500,7 @@ Markdown 渲染管线：
 | 动效 | 仅 `transform` / `opacity`；150–300ms；尊重 `prefers-reduced-motion` |
 | 状态 | 每个列表必须提供加载、空、错误三态 |
 | 反馈 | 保存按钮提交中禁用并显示“保存中”；删除必须二次确认 |
-| 版本 | 页脚与后台侧栏显示 `v1.0.2 by Mr lin`，版本号在署名之前 |
+| 版本 | 页脚与后台侧栏显示 `v1.0.3 by Mr lin`，版本号在署名之前 |
 
 ### 6.5 后台交互
 
@@ -576,7 +586,7 @@ ENTRYPOINT ["/app/dev-notes"]
 ```yaml
 services:
   dev-notes:
-    image: dev-notes:1.0.2
+    image: dev-notes:1.0.3
     container_name: dev-notes
     restart: unless-stopped
     ports:
@@ -749,6 +759,7 @@ services:
 
 | 版本 | 日期 | 变更 |
 |---|---|---|
+| v1.0.3 | 2026-11-17 | 完成 Section 1：Go 骨架、SQLite 迁移、数据模型、Store、公开 API、健康检查与测试 |
 | v1.0.2 | 2026-11-17 | 确认第一版界面方案；新增详细技术方案 `doc/PROJECT.md`；同步版本与文档 |
 | v1.0.1 | 2026-11-17 | 新增 CODEBUDDY.md 工程约定文件；完成两版界面原型 |
 | v1.0.0 | 2026-11-17 | 初始设计方案 |
