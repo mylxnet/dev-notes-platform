@@ -1,6 +1,6 @@
 # 设计方案 · 我的开发笔记
 
-> v1.3.1 · by Mr lin · 2026-11-17
+> v1.3.2 · by Mr lin · 2026-11-17
 
 ## 一、开发目的
 
@@ -61,6 +61,8 @@ dev-notes-platform/
 │   │   ├── store/
 │   │   └── validate/
 │   └── go.mod
+├── content/notes/             # 文章源（Markdown + 头部字段），由导入工具写入站点
+├── tools/                     # 可直接使用的运维工具（如批量导入文章）
 ├── web/                       # Vue 前台 + 管理界面源码
 │   ├── src/
 │   ├── public/media/          # 文章内插图（SVG），构建时原样进入 dist/
@@ -80,7 +82,7 @@ dev-notes-platform/
 3. 笔记详情：Markdown 正文渲染
 4. 项目列表与详情：定位、技术栈、源码仓库外链、关联笔记
 5. 关于：站点说明、非经营性声明、备案号占位
-6. 页脚：备案号位置（备案通过后显示）、`v1.3.1 by Mr lin`
+6. 页脚：备案号位置（备案通过后显示）、`v1.3.2 by Mr lin`
 
 ### 后台（单管理员）
 
@@ -171,6 +173,7 @@ admin
 
 | 版本 | 日期 | 变更 |
 |---|---|---|
+| v1.3.2 | 2026-11-17 | 新增 `content/notes/` 文章源与 `tools/import-notes.sh` 导入工具（按 slug 幂等），录入 SuperClip-C 的 4 篇技术复盘 |
 | v1.3.1 | 2026-11-17 | 修复 HTTP 访问下 Secure Cookie 被浏览器丢弃导致后台登录后立即失效；`COOKIE_SECURE` 改为 auto/true/false 三档 |
 | v1.3.0 | 2026-11-17 | 新增站内配图目录 `/media/`：图片白名单放宽至 `/assets/` 与 `/media/`；正文图片等比自适应；新增两张技术插图（SiteGuard 同源判定、mailhub IMAP 游标）；修正页脚版本行被主题按钮遮挡 |
 | v1.2.0 | 2026-11-17 | 完成 Section 3：后台管理与认证、CSRF、登录限流、内容前置校验、Markdown 渲染净化、前台正文服务端渲染 |

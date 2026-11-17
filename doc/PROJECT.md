@@ -1,8 +1,8 @@
 # 技术方案 · 我的开发笔记
 
-> v1.3.1 · by Mr lin · 2026-11-17
+> v1.3.2 · by Mr lin · 2026-11-17
 >
-> 依据：`doc/DESIGN.md` v1.3.1、已确认的 `prototype/` 第一版界面。本文档是后续编码、测试、部署的实施依据，代码实现与本文档不一致时，以本文档评审结论为准。
+> 依据：`doc/DESIGN.md` v1.3.2、已确认的 `prototype/` 第一版界面。本文档是后续编码、测试、部署的实施依据，代码实现与本文档不一致时，以本文档评审结论为准。
 
 ## 一、方案目标与范围
 
@@ -50,7 +50,7 @@
 | Section 1 | 已完成（2026-11-17） | Go 模块、配置、SQLite 迁移、数据模型、Store、公开 API、健康检查、单元与接口测试 |
 | Section 2 | 已完成（2026-11-17） | 前台正式页面接入真实 API、history 路由与 SPA 回退、静态资源 embed、构建脚本 |
 | Section 3 | 已完成（2026-11-17） | 后台登录与管理界面、认证会话、CSRF、前置校验、Markdown 渲染净化 |
-| Section 4 | 待开始 | 真实内容录入 |
+| Section 4 | 进行中（2026-11-17） | 真实内容录入：文章源进 `content/notes/`，`tools/import-notes.sh` 批量导入；已录入 SuperClip-C 的 4 篇 |
 | Section 5 | 待开始 | Docker、1Panel、端到端验收 |
 
 ## 二、总体架构
@@ -125,6 +125,7 @@ dev-notes-platform/
 │   ├── PROJECT.md             本技术方案
 │   ├── PROJECT_STATE.md       状态与交接
 │   └── DEPLOY.md              部署手册
+├── content/notes/             文章源（Markdown + 头部字段），随代码版本化
 ├── prototype/                 已确认的第一版界面原型（冻结参考）
 ├── prototype-v2/              第二版候选（归档，不参与构建）
 ├── app/                       Go 主程序
@@ -154,6 +155,8 @@ dev-notes-platform/
 ├── deploy/
 │   ├── docker-compose.yml
 │   └── .env.example
+├── tools/
+│   └── import-notes.sh        批量导入 content/notes 下的文章（幂等）
 ├── scripts/
 │   ├── build.sh               构建二进制与镜像
 │   └── package.sh             生成发布包
@@ -512,7 +515,7 @@ v1.3.0 实现位置：字段规则与词汇拦截在 `internal/validate`，渲�
 | 动效 | 仅 `transform` / `opacity`；150–300ms；尊重 `prefers-reduced-motion` |
 | 状态 | 每个列表必须提供加载、空、错误三态 |
 | 反馈 | 保存按钮提交中禁用并显示“保存中”；删除必须二次确认 |
-| 版本 | 页脚、后台侧栏与登录页显示 `v1.3.1 by Mr lin`，版本号在署名之前 |
+| 版本 | 页脚、后台侧栏与登录页显示 `v1.3.2 by Mr lin`，版本号在署名之前 |
 
 ### 6.5 后台交互
 
@@ -804,10 +807,49 @@ v1.3.0 补充图片通道用例：`/assets/demo.png` 与 `/media/siteguard-arch.
 | Q5 | 初始管理员账号密码 | 首次启动 | 部署时通过 `.env` 注入，不写入文档 |
 | Q6 | 第二版原型是否保留 | 仓库体积与混淆 | 归档在 `prototype-v2/`，不参与构建；确认后可删除 |
 
-## 十二、变更记录
+## 十二、内容录入流程（v1.3.2 起）
+
+内容不再只存在于数据库，源文件随代码版本化，换机器或重建库都能复现。
+
+### 12.1 文章格式
+
+`content/notes/<slug>.md`，首尾 `---` 之间为头部字段，其后为 Markdown 正文：
+
+```markdown
+---
+title: 标题（1–120 字）
+slug: 链接标识（小写字母、数字与连字符）
+summary: 摘要（1–300 字，列表页展示）
+project: superclip          # 项目 slug，留空表示不关联
+status: published           # published / draft / hidden
+published_at: 2026-11-17T02:00:00Z
+---
+
+正文……
+```
+
+### 12.2 导入
+
+```bash
+# 新建（slug 已存在则跳过，可反复执行）
+ADMIN_PASSWORD=你的密码 API=http://127.0.0.1:8080 bash tools/import-notes.sh
+
+# 覆盖更新已有文章正文
+ADMIN_PASSWORD=你的密码 MODE=update bash tools/import-notes.sh
+```
+
+要点：
+
+- `project` 字段按项目 slug 解析成 `project_id`，项目不存在时该篇按"不关联"导入，脚本不报错；
+- 导入走管理 API，因此同样经过服务端校验（长度、slug 格式、经营性词汇与下载类表述拦截）；
+- 正文插图放 `web/public/media/`，正文里用 `/media/xxx.svg` 引用（白名单见 5.8）；
+- 脚本只处理文字内容，不做图片上传。
+
+## 十三、变更记录
 
 | 版本 | 日期 | 变更 |
 |---|---|---|
+| v1.3.2 | 2026-11-17 | 新增 `content/notes/` 文章源与 `tools/import-notes.sh`（按 slug 幂等），录入 SuperClip-C 的 4 篇技术复盘 |
 | v1.3.1 | 2026-11-17 | 修复 HTTP 访问下 Secure Cookie 被丢弃导致后台登录后立即失效；`COOKIE_SECURE` 改为 auto/true/false 三档并新增对应测试 |
 | v1.3.0 | 2026-11-17 | 新增站内配图目录 `/media/`：图片白名单放宽至 `/assets/` 与 `/media/`；正文图片改为等比自适应；新增两张技术插图（SiteGuard 同源判定、mailhub IMAP 游标） |
 | v1.2.0 | 2026-11-17 | 完成 Section 3：后台管理与认证、CSRF、登录限流、内容前置校验、Markdown 渲染净化、前台正文服务端渲染 |

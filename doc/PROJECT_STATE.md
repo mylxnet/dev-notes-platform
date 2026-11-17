@@ -1,12 +1,26 @@
 # 项目状态 · 我的开发笔记
 
-> v1.3.1 · by Mr lin · 2026-11-17
+> v1.3.2 · by Mr lin · 2026-11-17
 
 ## 当前版本
 
-v1.3.1 · Section 3 已完成：后台管理与认证、内容前置校验、Markdown 渲染净化、前台正文改为服务端渲染；补丁版本补上站内配图通道（`/media/`）与 HTTP 下的会话可用性修复。下一阶段 Section 4（真实内容录入）。
+v1.3.2 · Section 3 已完成：后台管理与认证、内容前置校验、Markdown 渲染净化、前台正文改为服务端渲染；本轮开始 Section 4，文章源进仓库并打通可重复导入。下一阶段继续录入真实内容（项目 6 个、笔记余量）。
 
-## 本轮改动记录（v1.3.1，2026-11-17）
+## 本轮改动记录（v1.3.2，2026-11-17）
+
+- 新增 `content/notes/`：文章为 Markdown + 头部字段（`title`/`slug`/`summary`/`project`/`status`/`published_at`），随代码版本化。
+- 新增 `tools/import-notes.sh`：登录管理 API 后逐篇导入，`project` 按项目 slug 解析为 `project_id`；按 slug 幂等，默认跳过已存在，`MODE=update` 覆盖。
+- 录入 4 篇文章（均关联 SuperClip-C）：`win32-topmost-silently-dropped`、`sendinput-batch-alt-keyup`、`rc-codepage-resource-garbled`、`favorite-partition-invariant`，素材取自该仓库 `doc/PROJECT_STATE.md` 的真实踩坑记录。
+- 选题口径：只写有明确现象、可复现根因、有事后判据的复盘，不写泛泛的"最佳实践"。
+
+### 验收证据（v1.3.2，2026-11-17）
+
+- 导入（对运行中的 `http://localhost:18080`）：`创建 4，更新 0，跳过 0，失败 0`。
+- 幂等复跑：`创建 0，更新 0，跳过 4，失败 0`。
+- 接口核对：`/api/notes` 总数 3 → 7；`/api/projects` 中 `superclip` 的 `note_count` 1 → 5，4 篇均落在 SuperClip-C 下。
+- 浏览器验收（Playwright + WSL 内 Chromium，1280px）：笔记列表 7 条；4 篇详情页均 `h1` 正确、`h2` 各 5 个、代码块与表格正常渲染（如 `win32-topmost-silently-dropped`：`pre=2`、`table=1`、`p=9`）。
+
+## 历史改动记录（v1.3.1，2026-11-17）
 
 - `COOKIE_SECURE` 由布尔改为三档：`auto`（默认）/ `true`(always) / `false`(never)，非法值启动即失败。
 - `auth.NewManager` 第二个参数改为 `CookieSecureMode`；新增 `useSecure(c)`：`auto` 下直连 TLS 或请求头 `X-Forwarded-Proto: https` 才加 `Secure`。
@@ -185,9 +199,9 @@ v1.3.1 · Section 3 已完成：后台管理与认证、内容前置校验、Mar
 
 1. 确认 mailhub 正确仓库地址，或决定移除
 2. 确认 6 个项目的真实 GitHub 地址与许可证状态
-3. 确认 5 篇笔记的真实内容来源
+3. Section 4 进行中：已录入 SuperClip-C 的 4 篇；剩余 SiteGuard、LanFileShare 的真实内容与项目地址待确认
 4. 录入文章时为 `siteguard-origin.svg`、`mailhub-imap-cursor.svg` 补正文引用
-5. Section 4：真实内容录入
+5. `tools/import-notes.sh` 目前只处理新建与更新，未做正文配图上传（插图仍走 `web/public/media/`）
 6. Section 5：Docker + 1Panel 部署 + 浏览器验收
 7. 每个 Section 完成后升小版本、同步文档并提交
 
@@ -197,10 +211,10 @@ v1.3.1 · Section 3 已完成：后台管理与认证、内容前置校验、Mar
 
 | 位置 | 当前值 |
 |---|---|
-| `app/VERSION` / `app/main.go` | `1.3.1` |
-| `web/package.json` / `web/package-lock.json` | `1.3.1` |
-| `web/src/components/SiteFooter.vue` / 后台侧栏 / 登录页 | `v1.3.1 by Mr lin` |
-| `doc/*.md` / `README.md` / `CHANGELOG.md` | `v1.3.1` |
+| `app/VERSION` / `app/main.go` | `1.3.2` |
+| `web/package.json` / `web/package-lock.json` | `1.3.2` |
+| `web/src/components/SiteFooter.vue` / 后台侧栏 / 登录页 | `v1.3.2 by Mr lin` |
+| `doc/*.md` / `README.md` / `CHANGELOG.md` | `v1.3.2` |
 
 `scripts/build.sh` 在编译前校验 `app/main.go` 的 `var version` 与 `app/VERSION` 一致，不一致直接失败。原型工程 `prototype/` 仍为 `v1.0.3`，作为冻结基线不再跟随版本。
 

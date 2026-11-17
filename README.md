@@ -7,7 +7,7 @@
 [![Backend](https://img.shields.io/badge/Backend-Go%201.27%20%2B%20Gin-00ADD8?logo=go&logoColor=white)](https://go.dev/)
 [![Frontend](https://img.shields.io/badge/Frontend-Vue%203%20%2B%20Vite%206-42b883?logo=vuedotjs&logoColor=white)](https://vuejs.org/)
 [![Database](https://img.shields.io/badge/Database-SQLite-003B57?logo=sqlite&logoColor=white)](https://www.sqlite.org/)
-[![Version](https://img.shields.io/badge/Version-1.3.1-d97757)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.3.2-d97757)](CHANGELOG.md)
 [![Deploy](https://img.shields.io/badge/Deploy-Docker%20%2B%201Panel-2496ED?logo=docker&logoColor=white)](doc/DEPLOY.md)
 
 [English](#english) | [中文](#中文)
@@ -149,6 +149,9 @@ dev-notes-platform/
 │   ├── src/components/    通用组件
 │   ├── public/media/      文章插图（SVG），构建时原样进产物
 │   └── vite.config.ts     产物输出到 app/internal/webui/dist
+├── content/notes/         文章源（Markdown + 头部字段），随代码版本化
+├── tools/
+│   └── import-notes.sh    批量导入文章（按 slug 幂等）
 ├── prototype/             已确认的第一版界面原型（冻结基线）
 ├── prototype-v2/          第二版候选（归档，不参与构建）
 ├── deploy/                容器编排（Section 5）
@@ -170,6 +173,7 @@ dev-notes-platform/
 | 新建/编辑笔记 | 后台「笔记管理」→「新建笔记」，或行内「编辑」 |
 | 预览 Markdown | 编辑页点「预览」，走服务端渲染管线 |
 | 给文章插插图 | 图片放 `web/public/media/`，正文写 `![说明](/media/文件名.svg)` |
+| 批量导入文章 | 文章写进 `content/notes/*.md`，执行 `ADMIN_PASSWORD=密码 bash tools/import-notes.sh`（已存在的 slug 默认跳过，`MODE=update` 覆盖） |
 | 修改密码 | 后台「账号设置」，当前页面会自动续期 |
 | 构建可交付二进制 | `bash scripts/build.sh` |
 | 跑后端测试 | `cd app && go test ./... -count=1` |
@@ -195,7 +199,7 @@ dev-notes-platform/
 
 ### 📜 更新日志
 
-当前版本 **v1.3.1**（Section 3：后台管理与认证、内容前置校验、Markdown 渲染净化；本版修复 HTTP 访问下会话 Cookie 被丢弃导致后台无法登录的问题）。
+当前版本 **v1.3.2**（Section 3：后台管理与认证、内容前置校验、Markdown 渲染净化；本版起文章源进仓库，可用 `tools/import-notes.sh` 批量导入）。
 
 逐版本明细详见 [CHANGELOG.md](CHANGELOG.md)。
 

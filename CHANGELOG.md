@@ -6,6 +6,7 @@
 
 | 版本 | 日期 | 摘要 |
 |---|---|---|
+| v1.3.2 | 2026-11-17 | 新增 `content/notes/` 文章源与 `tools/import-notes.sh` 导入工具，录入 SuperClip-C 的 4 篇技术复盘 |
 | v1.3.1 | 2026-11-17 | 修复 HTTP 访问下 Secure Cookie 被丢弃导致后台登录后立即失效 |
 | v1.3.0 | 2026-11-17 | 新增站内配图目录 `/media/` 与两张技术插图，正文图片按容器等比缩放 |
 | v1.2.0 | 2026-11-17 | 完成 Section 3：后台管理与认证、内容校验、Markdown 渲染净化、前台正文改为服务端渲染 |
@@ -16,6 +17,22 @@
 | v1.0.0 | 2026-11-17 | 初始设计方案 |
 
 ## 详细更新日志（按版本倒序）
+
+### v1.3.2 · 2026-11-17
+
+**新增**
+
+- 新增 `content/notes/`：文章以 Markdown + 简单头部字段（`title` / `slug` / `summary` / `project` / `status` / `published_at`）落仓库，正文与代码一起版本化。
+- 新增 `tools/import-notes.sh`：登录后台后逐篇导入，`project` 字段按项目 slug 自动解析成 `project_id`；按 slug 幂等，已存在默认跳过，`MODE=update` 时覆盖更新。
+- 录入 SuperClip-C 的 4 篇技术复盘：`win32-topmost-silently-dropped`、`sendinput-batch-alt-keyup`、`rc-codepage-resource-garbled`、`favorite-partition-invariant`，素材来自该项目 `doc/PROJECT_STATE.md` 的真实踩坑记录。
+
+**优化**
+
+- 文章内容不再只存在数据库里：源文件进仓库后，换机器、重建库都能一键复现，补上「Section 4 真实内容录入」的可重复路径。
+
+**调整**
+
+- 版本统一升至 `v1.3.2`：`app/VERSION`、`app/main.go`、`web/package.json`/lock、页脚、后台侧栏与登录页、文档同步。
 
 ### v1.3.1 · 2026-11-17
 
