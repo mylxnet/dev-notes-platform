@@ -1,12 +1,25 @@
 # 项目状态 · 我的开发笔记
 
-> v1.3.4 · by Mr lin · 2026-11-17
+> v1.3.5 · by Mr lin · 2026-11-17
 
 ## 当前版本
 
-v1.3.4 · Section 3 已完成，Section 4 进行中：三个项目各 4 篇真实复盘已录入（SiteGuard / SuperClip-C / LanFileShare），文章源在 `content/notes/`，可一键复现；配图通道 `/media/` 已端到端验证。下一阶段：清理早期 3 篇占位笔记，进入 Section 5 部署。
+v1.3.5 · Section 3 已完成，Section 4 进行中：4 个项目（SiteGuard / SuperClip-C / LanFileShare / excelMailmerge）共 19 篇，其中 16 篇为真实复盘，3 篇仍是早期占位。下一阶段：清理占位笔记，进入 Section 5 部署。
 
-## 本轮改动记录（v1.3.4，2026-11-17）
+## 本轮改动记录（v1.3.5，2026-11-17）
+
+- 新增项目 `excelMailmerge`（id=4）：`C#/.NET 8/WPF/ClosedXML`，源码外链 `mylxnet/excelMailmerge`。
+- 新增 4 篇：`wpf-invariant-globalization-crash`、`excel-row-probe-infinite-loop`、`wpf-progress-binding-and-ui-thread`、`single-instance-mutex-after-kill`。
+- **按用户反馈调整写作方式**：这 4 篇不用同一骨架，分别写成「打包参数对照」「时间线叙事」「症状清单」「时序推演」；约定写入 `doc/PROJECT.md` §12.3。
+
+### 验收证据（v1.3.5，2026-11-17）
+
+- 项目创建：`POST /api/admin/projects` 返回 `id=4 slug=excelmailmerge`。
+- 导入：`创建 4，更新 0，跳过 12，失败 0`。
+- 站点统计：笔记 19 篇；`siteguard / superclip / lanfileshare` 各 5 篇，`excelmailmerge` 4 篇。
+- 浏览器（Chromium 1280px）：项目页技术栈 `['C#', '.NET 8', 'WPF', 'ClosedXML']`、外链为真实仓库；4 篇详情页结构确实不同——`h2` 数量 4/3/5/4，表格出现 1/1/0/0，列表出现 0/0/0/1。
+
+## 历史改动记录（v1.3.4，2026-11-17）
 
 - 录入 SiteGuard 4 篇：`fnos-fpk-install-rejected`、`gateway-base-href-missing-assets`、`reverse-proxy-origin-403`、`baseline-filter-asymmetry`，素材来自该仓库 `doc/DEBUG_FPK.md` 与 `doc/PROJECT_STATE.md` 的踩坑 4/5/6。
 - `reverse-proxy-origin-403` 正文首次使用 `/media/siteguard-origin.svg`，把 v1.3.0 建立的配图通道跑通端到端（此前两张图一直没被引用）。
@@ -237,10 +250,10 @@ v1.3.4 · Section 3 已完成，Section 4 进行中：三个项目各 4 篇真�
 
 | 位置 | 当前值 |
 |---|---|
-| `app/VERSION` / `app/main.go` | `1.3.4` |
-| `web/package.json` / `web/package-lock.json` | `1.3.4` |
-| `web/src/components/SiteFooter.vue` / 后台侧栏 / 登录页 | `v1.3.4 by Mr lin` |
-| `doc/*.md` / `README.md` / `CHANGELOG.md` | `v1.3.4` |
+| `app/VERSION` / `app/main.go` | `1.3.5` |
+| `web/package.json` / `web/package-lock.json` | `1.3.5` |
+| `web/src/components/SiteFooter.vue` / 后台侧栏 / 登录页 | `v1.3.5 by Mr lin` |
+| `doc/*.md` / `README.md` / `CHANGELOG.md` | `v1.3.5` |
 
 `scripts/build.sh` 在编译前校验 `app/main.go` 的 `var version` 与 `app/VERSION` 一致，不一致直接失败。原型工程 `prototype/` 仍为 `v1.0.3`，作为冻结基线不再跟随版本。
 

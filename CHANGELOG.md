@@ -6,6 +6,7 @@
 
 | 版本 | 日期 | 摘要 |
 |---|---|---|
+| v1.3.5 | 2026-11-17 | 新增 excelMailmerge 项目与 4 篇复盘；确立「同批文章不套同一骨架」的写作约定 |
 | v1.3.4 | 2026-11-17 | 录入 SiteGuard 的 4 篇技术复盘，其中一篇启用 `/media/` 插图 |
 | v1.3.3 | 2026-11-17 | 录入 LanFileShare 的 4 篇技术复盘，三个项目卡片的仓库地址与技术栈改为真实值 |
 | v1.3.2 | 2026-11-17 | 新增 `content/notes/` 文章源与 `tools/import-notes.sh` 导入工具，录入 SuperClip-C 的 4 篇技术复盘 |
@@ -19,6 +20,18 @@
 | v1.0.0 | 2026-11-17 | 初始设计方案 |
 
 ## 详细更新日志（按版本倒序）
+
+### v1.3.5 · 2026-11-17
+
+**新增**
+
+- 新增第 4 个项目 `excelMailmerge`（C# / .NET 8 / WPF / ClosedXML，MIT），源码外链 `https://github.com/mylxnet/excelMailmerge`。
+- 新增 4 篇文章：`wpf-invariant-globalization-crash`、`excel-row-probe-infinite-loop`、`wpf-progress-binding-and-ui-thread`、`single-instance-mutex-after-kill`，素材来自该仓库 `PROJECT_STATE.md` 的 BUG-01/02/05/09/10/11/12/13。
+
+**调整**
+
+- **写作约定：同批文章不再共用同一个骨架**。这 4 篇分别采用「打包参数对照」「时间线叙事」「症状清单」与「时序推演」四种结构，避免整页读起来像同一份模板填空；约定已写入 `doc/PROJECT.md` 第十二节。
+- 版本统一升至 `v1.3.5`：`app/VERSION`、`app/main.go`、`web/package.json`/lock、页脚、后台侧栏与登录页、文档同步。
 
 ### v1.3.4 · 2026-11-17
 
