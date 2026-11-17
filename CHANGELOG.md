@@ -6,6 +6,7 @@
 
 | 版本 | 日期 | 摘要 |
 |---|---|---|
+| v1.3.4 | 2026-11-17 | 录入 SiteGuard 的 4 篇技术复盘，其中一篇启用 `/media/` 插图 |
 | v1.3.3 | 2026-11-17 | 录入 LanFileShare 的 4 篇技术复盘，三个项目卡片的仓库地址与技术栈改为真实值 |
 | v1.3.2 | 2026-11-17 | 新增 `content/notes/` 文章源与 `tools/import-notes.sh` 导入工具，录入 SuperClip-C 的 4 篇技术复盘 |
 | v1.3.1 | 2026-11-17 | 修复 HTTP 访问下 Secure Cookie 被丢弃导致后台登录后立即失效 |
@@ -18,6 +19,18 @@
 | v1.0.0 | 2026-11-17 | 初始设计方案 |
 
 ## 详细更新日志（按版本倒序）
+
+### v1.3.4 · 2026-11-17
+
+**新增**
+
+- 录入 SiteGuard 的 4 篇技术复盘：`fnos-fpk-install-rejected`（装包报错只有一句话，用裸模板单变量二分锁定两个 wizard 文件）、`gateway-base-href-missing-assets`（网关入口无尾斜杠导致相对路径 404，服务端注入 `<base>` 修复）、`reverse-proxy-origin-403`（反代改写 Host 使写操作全被判跨站，改用自定义请求头）、`baseline-filter-asymmetry`（忽略规则只过滤当前文本、基线未过滤导致规则失效）。
+- `reverse-proxy-origin-403` 正文首次启用 `/media/` 插图：`![网关反代下 Origin 与 Host 对不上](/media/siteguard-origin.svg)`，验证 v1.3.0 放开的配图通道端到端可用。
+
+**调整**
+
+- 三个项目内容量趋于均衡：SiteGuard 5 篇、SuperClip-C 5 篇、LanFileShare 5 篇（含各自早期 1 篇占位）。
+- 版本统一升至 `v1.3.4`：`app/VERSION`、`app/main.go`、`web/package.json`/lock、页脚、后台侧栏与登录页、文档同步。
 
 ### v1.3.3 · 2026-11-17
 

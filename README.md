@@ -7,7 +7,7 @@
 [![Backend](https://img.shields.io/badge/Backend-Go%201.27%20%2B%20Gin-00ADD8?logo=go&logoColor=white)](https://go.dev/)
 [![Frontend](https://img.shields.io/badge/Frontend-Vue%203%20%2B%20Vite%206-42b883?logo=vuedotjs&logoColor=white)](https://vuejs.org/)
 [![Database](https://img.shields.io/badge/Database-SQLite-003B57?logo=sqlite&logoColor=white)](https://www.sqlite.org/)
-[![Version](https://img.shields.io/badge/Version-1.3.3-d97757)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.3.4-d97757)](CHANGELOG.md)
 [![Deploy](https://img.shields.io/badge/Deploy-Docker%20%2B%201Panel-2496ED?logo=docker&logoColor=white)](doc/DEPLOY.md)
 
 [English](#english) | [中文](#中文)
@@ -199,7 +199,7 @@ dev-notes-platform/
 
 ### 📜 更新日志
 
-当前版本 **v1.3.3**（Section 3 已完成；Section 4 进行中：SuperClip-C 与 LanFileShare 各 4 篇技术复盘已录入，项目卡片指向真实源码仓库）。
+当前版本 **v1.3.4**（Section 3 已完成；Section 4 进行中：三个项目各 4 篇真实复盘已录入，项目卡片指向真实源码仓库，正文配图走站内 `/media/`）。
 
 逐版本明细详见 [CHANGELOG.md](CHANGELOG.md)。
 

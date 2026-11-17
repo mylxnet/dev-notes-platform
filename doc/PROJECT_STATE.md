@@ -1,12 +1,24 @@
 # 项目状态 · 我的开发笔记
 
-> v1.3.3 · by Mr lin · 2026-11-17
+> v1.3.4 · by Mr lin · 2026-11-17
 
 ## 当前版本
 
-v1.3.3 · Section 3 已完成，Section 4 进行中：文章源进 `content/notes/` 并打通可重复导入；SuperClip-C 与 LanFileShare 各 4 篇已录入，三个项目卡片的仓库地址与技术栈已改为真实值。下一阶段：SiteGuard 的真实内容、替换早期占位笔记。
+v1.3.4 · Section 3 已完成，Section 4 进行中：三个项目各 4 篇真实复盘已录入（SiteGuard / SuperClip-C / LanFileShare），文章源在 `content/notes/`，可一键复现；配图通道 `/media/` 已端到端验证。下一阶段：清理早期 3 篇占位笔记，进入 Section 5 部署。
 
-## 本轮改动记录（v1.3.3，2026-11-17）
+## 本轮改动记录（v1.3.4，2026-11-17）
+
+- 录入 SiteGuard 4 篇：`fnos-fpk-install-rejected`、`gateway-base-href-missing-assets`、`reverse-proxy-origin-403`、`baseline-filter-asymmetry`，素材来自该仓库 `doc/DEBUG_FPK.md` 与 `doc/PROJECT_STATE.md` 的踩坑 4/5/6。
+- `reverse-proxy-origin-403` 正文首次使用 `/media/siteguard-origin.svg`，把 v1.3.0 建立的配图通道跑通端到端（此前两张图一直没被引用）。
+
+### 验收证据（v1.3.4，2026-11-17）
+
+- 导入：`创建 4，更新 0，跳过 8，失败 0`。
+- 用 v1.3.3→v1.3.4 二进制 + 数据库副本起临时实例（`:18084`）：`/healthz` 返回 `version: "1.3.4"`；`/api/notes/reverse-proxy-origin-403` 的 `content_html` 保留 `<img src="/media/siteguard-origin.svg" alt="网关反代下 Origin 与 Host 对不上">`；`/media/siteguard-origin.svg` 返回 `200 image/svg+xml`（2946 字节）。
+- 浏览器（Chromium 1280px）：该文详情页插图 `naturalWidth=860 naturalHeight=330`，渲染 `719×276`，比例与原始一致，未被压扁。
+- 站点统计：笔记 15 篇；siteguard / superclip / lanfileshare 各 5 篇。
+
+## 历史改动记录（v1.3.3，2026-11-17）
 
 - 录入 LanFileShare 4 篇：`http-listener-to-tcplistener`、`streaming-multipart-1mb-window`、`device-name-to-safe-path`、`ua-model-detection`，素材来自该仓库 `README.md` / `DEVELOPMENT.md` / `RELEASES.md`。
 - 项目卡片纠错（走管理 API `PUT /api/admin/projects/:id`）：仓库地址从 `github.com/example/*` 占位改为 `mylxnet/site-guard`、`mylxnet/SuperClip-C`、`mylxnet/LanFileShare`；技术栈分别改为 `Node.js/ESM/单容器自托管`、`C++/Win32 API/CMake`、`C#/WPF/.NET 8`。
@@ -213,12 +225,11 @@ v1.3.3 · Section 3 已完成，Section 4 进行中：文章源进 `content/note
 
 1. 确认 mailhub 正确仓库地址，或决定移除
 2. 确认 6 个项目的真实 GitHub 地址与许可证状态
-3. Section 4 进行中：SuperClip-C 与 LanFileShare 各 4 篇已录入；SiteGuard 仍只有 1 篇早期占位笔记，需按其仓库真实内容重写
-4. 占位笔记 `lan-discovery`（讲 UDP 广播与 Go，与实际 C# 实现不符）待替换或下线，尚未处理
-5. 录入文章时为 `siteguard-origin.svg`、`mailhub-imap-cursor.svg` 补正文引用
-6. `tools/import-notes.sh` 目前只处理新建与更新，未做正文配图上传（插图仍走 `web/public/media/`）
-7. Section 5：Docker + 1Panel 部署 + 浏览器验收
-8. 每个 Section 完成后升小版本、同步文档并提交
+3. 三篇早期占位笔记仍在前台，与实际实现不符，需逐篇替换或转草稿：`lan-discovery`（讲 UDP 广播 + Go，实际是 C# 扫码上传）、`sqlite-pure-go-driver`（讲 Go/CGo，项目其实是 Node.js）、`clipboard-history-design`（原型期设想，未对照 C++ 实现核对）
+4. `mailhub-imap-cursor.svg` 仍未在任何文章中被引用（`siteguard-origin.svg` 已随 `reverse-proxy-origin-403` 上线）
+5. `tools/import-notes.sh` 目前只处理新建与更新，未做正文配图上传（插图仍走 `web/public/media/`）
+6. Section 5：Docker + 1Panel 部署 + 浏览器验收
+7. 每个 Section 完成后升小版本、同步文档并提交
 
 ## 版本一致性检查
 
@@ -226,10 +237,10 @@ v1.3.3 · Section 3 已完成，Section 4 进行中：文章源进 `content/note
 
 | 位置 | 当前值 |
 |---|---|
-| `app/VERSION` / `app/main.go` | `1.3.3` |
-| `web/package.json` / `web/package-lock.json` | `1.3.3` |
-| `web/src/components/SiteFooter.vue` / 后台侧栏 / 登录页 | `v1.3.3 by Mr lin` |
-| `doc/*.md` / `README.md` / `CHANGELOG.md` | `v1.3.3` |
+| `app/VERSION` / `app/main.go` | `1.3.4` |
+| `web/package.json` / `web/package-lock.json` | `1.3.4` |
+| `web/src/components/SiteFooter.vue` / 后台侧栏 / 登录页 | `v1.3.4 by Mr lin` |
+| `doc/*.md` / `README.md` / `CHANGELOG.md` | `v1.3.4` |
 
 `scripts/build.sh` 在编译前校验 `app/main.go` 的 `var version` 与 `app/VERSION` 一致，不一致直接失败。原型工程 `prototype/` 仍为 `v1.0.3`，作为冻结基线不再跟随版本。
 
