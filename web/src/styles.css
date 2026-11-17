@@ -624,6 +624,91 @@ h2 {
   box-shadow: var(--shadow);
 }
 
+.article-markdown {
+  font-size: 1.02rem;
+  line-height: 1.85;
+}
+
+.article-markdown > * + * {
+  margin-top: 18px;
+}
+
+.article-markdown h2 {
+  font-size: 1.5rem;
+  margin-top: 36px;
+  letter-spacing: -0.02em;
+}
+
+.article-markdown h3 {
+  font-size: 1.2rem;
+  margin-top: 28px;
+}
+
+.article-markdown ul,
+.article-markdown ol {
+  padding-left: 22px;
+}
+
+.article-markdown li + li {
+  margin-top: 6px;
+}
+
+.article-markdown blockquote {
+  border-left: 3px solid var(--accent);
+  padding: 4px 0 4px 16px;
+  color: var(--muted);
+}
+
+.article-markdown code {
+  background: var(--surface-2);
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 0.9em;
+}
+
+.article-markdown pre {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 18px;
+  overflow-x: auto;
+}
+
+.article-markdown pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.article-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.94rem;
+}
+
+.article-markdown th,
+.article-markdown td {
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.article-markdown img {
+  max-width: 100%;
+  border-radius: 12px;
+}
+
+.article-markdown a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .empty {
   padding: 44px 20px;
   text-align: center;
@@ -840,6 +925,11 @@ tbody tr:hover {
   max-width: 520px;
 }
 
+/* 后台编辑页需要更宽的正文编辑区 */
+.form-grid-wide {
+  max-width: 880px;
+}
+
 .form-grid label {
   display: grid;
   gap: 8px;
@@ -848,13 +938,47 @@ tbody tr:hover {
 }
 
 .form-grid input,
-.form-grid textarea {
+.form-grid textarea,
+.form-grid select {
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);
   border-radius: 10px;
   padding: 10px 12px;
   width: 100%;
+  font: inherit;
+}
+
+.form-grid textarea {
+  resize: vertical;
+}
+
+.form-grid select:disabled,
+.form-grid input:disabled,
+.form-grid textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.editor-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.editor-textarea {
+  min-height: 340px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.92rem;
+  line-height: 1.7;
+}
+
+.preview-panel {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px 22px;
+  background: var(--surface);
+  min-height: 120px;
 }
 
 .field-error {

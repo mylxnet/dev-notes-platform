@@ -12,6 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"dev-notes-platform/internal/auth"
 	"dev-notes-platform/internal/model"
 	"dev-notes-platform/internal/store"
 )
@@ -61,7 +62,7 @@ func newTestServer(t *testing.T) http.Handler {
 		t.Fatalf("create draft note: %v", err)
 	}
 
-	return New(st, "test")
+	return New(st, "test", auth.NewManager(strings.Repeat("t", 32), false))
 }
 
 func TestHealth(t *testing.T) {

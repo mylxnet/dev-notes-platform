@@ -11,7 +11,7 @@ const loading = ref(true)
 const error = ref('')
 const notFound = ref(false)
 
-/** Markdown 渲染尚未接入，先把正文按空行拆成段落做纯文本展示。 */
+/** 服务端已渲染并净化，前端只负责展示；旧数据没有 HTML 时回退到纯文本分段。 */
 const paragraphs = computed(() => {
   const raw = note.value?.content ?? ''
   return raw
@@ -66,7 +66,10 @@ watch(
         <div class="eyebrow">{{ formatDate(note.published_at) }} · 开发笔记</div>
         <h1>{{ note.title }}</h1>
         <p class="lead">{{ note.summary }}</p>
-        <p v-for="(paragraph, index) in paragraphs" :key="index" style="white-space: pre-wrap">{{ paragraph }}</p>
+        <div v-if="note.content_html" class="article-markdown" v-html="note.content_html" />
+        <template v-else>
+          <p v-for="(paragraph, index) in paragraphs" :key="index" style="white-space: pre-wrap">{{ paragraph }}</p>
+        </template>
       </div>
       <aside class="article-aside">
         <dl>

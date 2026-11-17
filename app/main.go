@@ -11,11 +11,12 @@ import (
 	"time"
 
 	"dev-notes-platform/internal/api"
+	"dev-notes-platform/internal/auth"
 	"dev-notes-platform/internal/config"
 	"dev-notes-platform/internal/store"
 )
 
-var version = "1.1.0"
+var version = "1.2.0"
 
 func main() {
 	if err := run(); err != nil {
@@ -59,7 +60,8 @@ func run() error {
 		}
 	}
 
-	router := api.New(st, version)
+	sessions := auth.NewManager(cfg.SessionSecret, cfg.CookieSecure)
+	router := api.New(st, version, sessions)
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,
 		Handler:           router,

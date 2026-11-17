@@ -1,10 +1,34 @@
 # 项目状态 · 我的开发笔记
 
-> v1.1.0 · by Mr lin · 2026-11-17
+> v1.2.0 · by Mr lin · 2026-11-17
 
 ## 当前版本
 
-v1.1.0 · Section 2 已完成：正式前台接入真实公开 API、history 路由与 SPA 回退、静态资源嵌入二进制、构建脚本固化；下一阶段 Section 3（后台管理 + 认证）。
+v1.2.0 · Section 3 已完成：后台管理与认证、内容前置校验、Markdown 渲染净化、前台正文改为服务端渲染；下一阶段 Section 4（真实内容录入）。
+
+## Section 3 实施记录（2026-11-17）
+
+- 新增 `internal/auth`：签名 Cookie 会话（`dn_session`，12 小时，payload `v1|adminID|expires|admin.updated_at`）、CSRF 双提交（`dn_csrf` + `X-CSRF-Token`）、登录失败限流（同 IP 15 分钟 5 次）、`RequireAdmin` 中间件。
+- 新增 `internal/validate`：字段长度/slug 正则/GitHub 仓库地址/技术栈数量/密码强度，以及「经营性词汇」与「下载类表述」两级拦截，命中返回 `CONTENT_BLOCKED` + `hits` + `suggestion`。
+- 新增 `internal/render`：goldmark（GFM）+ bluemonday 白名单净化；不启用 `html.WithUnsafe()`，原始 HTML 丢弃；链接限 `http/https/站内/锚点`；图片仅允许 `/assets/`。
+- 新增管理 API：`POST /api/admin/login|logout`、`GET /api/admin/me`、`PUT /api/admin/password`、`POST /api/admin/preview`、笔记与项目 CRUD。写操作统一 CSRF 校验，请求体上限 1 MB。
+- 新增后台界面：登录页、`AdminLayout` 侧栏布局、笔记管理（状态筛选 + 搜索 + 行内删除确认）、笔记编辑（Markdown 预览 + 字段级错误定位 + 未保存离开提示）、项目管理、项目编辑、账号设置。
+- 前台笔记详情改用 `content_html`（服务端净化后的 HTML），并补充 `.article-markdown` 排版样式；站点头部恢复「后台管理」入口。
+- `store` 补充 `GetAdminByID`、`UpdateAdminPassword`（`updated_at` 单调递增保证旧会话失效）、`CountAllNotes`。
+- 路由 `api.New` 增加会话管理器参数；`main.go` 创建 `auth.Manager`。
+
+### 验收证据（2026-11-17）
+
+- `go test ./... -count=1` 全绿：`api`（17 个接口用例，含认证/CSRF/CRUD/拦截/限流）、`auth`、`validate`、`render`、`store`、`config`。
+- `bash scripts/build.sh` 通过版本一致性校验并产出 `app/build/dev-notes`（v1.2.0，前端 151 KB / gzip 54 KB）。
+- 浏览器交互验收（Playwright + 本机 Chrome，WSL 实例 IP 直连）：
+  - 未登录访问 `/admin/notes` → 跳 `/admin/login?redirect=/admin/notes`；
+  - 登录成功进入列表，3 行数据；新建笔记保存成功并出现在列表；
+  - 前台访问新笔记：`h2=1`、`pre>code=1`、`li=2`，Markdown 渲染正常；
+  - 提交含「网盘地址 / 获取安装包」的正文 → 422，页面显示「命中表述：获取安装包、网盘地址；修正建议：请改为源码仓库或删除下载相关表述」；
+  - 项目管理 3 行、7 列表头正常；删除笔记后列表不再出现；
+  - 修改密码成功提示「密码已更新，当前会话已自动续期」；
+  - 控制台无异常（仅未登录探测的 401 属预期）。
 
 ## Section 2 实施记录（2026-11-17）
 
@@ -61,6 +85,7 @@ v1.1.0 · Section 2 已完成：正式前台接入真实公开 API、history 路
 - Git 仓库初始化（`main`），首个基线提交 `3f41179`
 - Section 1：Go 模块、配置、SQLite 迁移、模型、Store、公开 API、健康检查、单元与接口测试
 - Section 2：正式前台、真实 API 接入、history 路由、静态资源 embed、构建脚本与浏览器验收
+- Section 3：后台管理与认证、内容前置校验、Markdown 渲染净化、前台正文服务端渲染
 
 ## 架构决策
 
@@ -81,6 +106,10 @@ v1.1.0 · Section 2 已完成：正式前台接入真实公开 API、history 路
 | D13 | 前端产物用 `embedui` 构建标签嵌入 | 默认构建不依赖前端产物，`go test ./...` 与本地 API 调试无需先构建前端 |
 | D14 | 项目 `note_count` 由 SQL 子查询统计 | 项目卡片需要关联笔记数，避免前端 N 次请求详情 |
 | D15 | 列表搜索由后端 `q` / `project` 过滤 | 与分页口径一致，前端只做展示与防抖 |
+| D16 | 后台编辑器采用独立页面而非弹窗 | Markdown 正文长，独立页写作与刷新更稳；弹窗在移动端高度受限 |
+| D17 | Markdown 在服务端渲染并净化后下发 | 前端不接触原始输入，避免存储型 XSS；预览复用同一管线 |
+| D18 | 会话不落库，用签名 Cookie 携带 `admin.updated_at` | 单管理员无需会话表，改密即让旧会话失效 |
+| D19 | 登录限流用进程内计数 | 单实例部署足够；重启后计数清零可接受 |
 
 ## 已知限制
 
@@ -88,8 +117,9 @@ v1.1.0 · Section 2 已完成：正式前台接入真实公开 API、history 路
 - SuperClip-C、LanFileShare 的许可证限制分发，站点只能放源码外链
 - 前台无评论、无访问统计（方案 A 范围外）
 - 第二版原型仅归档，不参与正式构建；是否删除待确认
-- 后台管理（`/admin`）尚未实现，站点头部暂不显示后台入口；`styles.css` 中后台样式暂时保留
-- 笔记正文按纯文本分段展示，Markdown 渲染与净化尚未接入
+- 后台编辑器为纯文本框 + 预览，暂无工具栏、快捷键与图片上传（图片只能用 `/assets/` 站内路径）
+- 登录限流计数存活于内存，多实例部署时各实例独立计数
+- 文章 slug 需手填，未做中文标题自动转拼音
 - Dockerfile、Compose 与 1Panel 部署尚未实现
 - 6 个项目的真实 GitHub 地址、5 篇笔记的真实内容尚未最终确认
 - 原型与构建复用了 `lxsyzd` WSL，未建项目专属隔离环境
@@ -107,16 +137,18 @@ v1.1.0 · Section 2 已完成：正式前台接入真实公开 API、history 路
 | 生产构建后直接访问 `/notes/xxx` 静态资源 404 | `base: './'` 生成相对路径，深路径下会解析到 `/notes/assets/...` | 改为 `base: '/'`，与 history 路由配合 | 使用 history 路由时 `base` 必须是绝对根路径 |
 | 无头浏览器截取异步页面得到全白图片 | `--virtual-time-budget` 下 Vue 过渡停留在 `fade-enter-from`（`opacity: 0`） | 改用 Playwright 真机等待后再截图/断言 | 截图空白的先查 DOM 与 `opacity`，不要直接判定页面渲染失败 |
 | 骨架屏与真实卡片复用同一 class，导致自动化断言计数错误 | 骨架容器沿用 `.note-row` / `.project-card` | 骨架改用独立 `.skeleton-block` | 加载态与内容态用不同 class，便于样式与测试区分 |
+| bluemonday 净化后站内图片 `src` 被清空 | 该库默认不允许相对 URL | 调用 `p.AllowRelativeURLs(true)`，同时用 `Matching` 限定 `^/assets/` | 净化库的默认策略要逐条验证，不能只看元素白名单 |
+| Windows 侧 `127.0.0.1:18080` 连接被拒，WSL 内 `curl` 正常 | WSL2 localhost 转发在重启实例后失效 | 改用 WSL 网卡 IP（`hostname -I`）访问 | 本机验收失败时先用 WSL 内 `curl` 排除服务问题，再怀疑端口转发 |
+| 后台导航指向 `/admin/notes` 但该路由未定义，点击后被重定向首页 | 路由只加了登录页，缺子路由 | 一次性补齐后台全部子路由后再联调 | 导航项与路由必须同批交付，避免出现「点了没反应」 |
 
 ## 待办清单
 
 1. 确认 mailhub 正确仓库地址，或决定移除
 2. 确认 6 个项目的真实 GitHub 地址与许可证状态
 3. 确认 5 篇笔记的真实内容来源
-4. Section 3：后台管理 + 认证 + 前置校验 + Markdown 渲染
-5. Section 4：真实内容录入
-6. Section 5：Docker + 1Panel 部署 + 浏览器验收
-7. 每个 Section 完成后升小版本、同步文档并提交
+4. Section 4：真实内容录入
+5. Section 5：Docker + 1Panel 部署 + 浏览器验收
+6. 每个 Section 完成后升小版本、同步文档并提交
 
 ## 版本一致性检查
 
@@ -124,10 +156,10 @@ v1.1.0 · Section 2 已完成：正式前台接入真实公开 API、history 路
 
 | 位置 | 当前值 |
 |---|---|
-| `app/VERSION` / `app/main.go` | `1.1.0` |
-| `web/package.json` / `web/package-lock.json` | `1.1.0` |
-| `web/src/components/SiteFooter.vue` | `v1.1.0 by Mr lin` |
-| `doc/*.md` / `README.md` / `CHANGELOG.md` | `v1.1.0` |
+| `app/VERSION` / `app/main.go` | `1.2.0` |
+| `web/package.json` / `web/package-lock.json` | `1.2.0` |
+| `web/src/components/SiteFooter.vue` / 后台侧栏 / 登录页 | `v1.2.0 by Mr lin` |
+| `doc/*.md` / `README.md` / `CHANGELOG.md` | `v1.2.0` |
 
 `scripts/build.sh` 在编译前校验 `app/main.go` 的 `var version` 与 `app/VERSION` 一致，不一致直接失败。原型工程 `prototype/` 仍为 `v1.0.3`，作为冻结基线不再跟随版本。
 

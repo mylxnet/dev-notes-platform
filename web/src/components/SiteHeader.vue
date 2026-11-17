@@ -1,7 +1,3 @@
-<script setup lang="ts">
-// 后台管理入口在 Section 3 接入认证后恢复，避免当前出现死链。
-</script>
-
 <template>
   <header class="site-header">
     <div class="container header-inner">
@@ -15,6 +11,9 @@
         <RouterLink to="/projects">项目</RouterLink>
         <RouterLink to="/about">关于</RouterLink>
       </nav>
+      <div class="header-actions">
+        <RouterLink to="/admin/notes" class="btn btn-ghost">后台管理</RouterLink>
+      </div>
     </div>
   </header>
 </template>

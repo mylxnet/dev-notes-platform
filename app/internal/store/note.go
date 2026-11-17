@@ -145,6 +145,29 @@ func (s *Store) ListAllNotes(ctx context.Context, filter AdminNoteFilter) ([]mod
 	return notes, rows.Err()
 }
 
+// CountAllNotes 返回后台笔记列表总数。
+func (s *Store) CountAllNotes(ctx context.Context, filter AdminNoteFilter) (int, error) {
+	var builder strings.Builder
+	builder.WriteString(`SELECT COUNT(*) FROM note n WHERE 1 = 1`)
+	args := make([]any, 0)
+
+	if filter.Status != "" {
+		builder.WriteString(` AND n.status = ?`)
+		args = append(args, filter.Status)
+	}
+	if filter.Keyword != "" {
+		builder.WriteString(` AND (n.title LIKE ? OR n.summary LIKE ?)`)
+		like := "%" + filter.Keyword + "%"
+		args = append(args, like, like)
+	}
+
+	var count int
+	if err := s.db.QueryRowContext(ctx, builder.String(), args...).Scan(&count); err != nil {
+		return 0, fmt.Errorf("count notes: %w", err)
+	}
+	return count, nil
+}
+
 // GetNoteByID 返回任意状态的笔记。
 func (s *Store) GetNoteByID(ctx context.Context, id int64) (*model.Note, error) {
 	row := s.db.QueryRowContext(ctx, `SELECT `+noteColumns+`

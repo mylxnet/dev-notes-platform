@@ -7,7 +7,7 @@
 [![Backend](https://img.shields.io/badge/Backend-Go%201.27%20%2B%20Gin-00ADD8?logo=go&logoColor=white)](https://go.dev/)
 [![Frontend](https://img.shields.io/badge/Frontend-Vue%203%20%2B%20Vite%206-42b883?logo=vuedotjs&logoColor=white)](https://vuejs.org/)
 [![Database](https://img.shields.io/badge/Database-SQLite-003B57?logo=sqlite&logoColor=white)](https://www.sqlite.org/)
-[![Version](https://img.shields.io/badge/Version-1.1.0-d97757)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.2.0-d97757)](CHANGELOG.md)
 [![Deploy](https://img.shields.io/badge/Deploy-Docker%20%2B%201Panel-2496ED?logo=docker&logoColor=white)](doc/DEPLOY.md)
 
 [English](#english) | [中文](#中文)
@@ -33,6 +33,9 @@
 | 单二进制交付 | 前端产物通过 `-tags embedui` 嵌入 Go 二进制，运行时零外部依赖 |
 | history 路由 | 真实路径 `/notes/:slug`，Go 侧回退 `index.html`，不用 hash |
 | 草稿不外泄 | 公开接口在 Store 层强制过滤 `published`，草稿与隐藏内容进不了前台 |
+| 单管理员后台 | 登录、笔记与项目管理、改密；签名 Cookie 会话 + CSRF 双提交 + 登录限流 |
+| 保存前拦截 | 经营性词汇与下载类表述在服务端拦截，返回命中词与修正建议，不合规内容存不进去 |
+| Markdown 安全渲染 | goldmark 解析 + bluemonday 白名单净化，禁用原始 HTML，图片仅允许站内 `/assets/` |
 | 轻依赖 | 前端只有 `vue` 与 `vue-router`，无 UI 库、无状态库、无外部字体 |
 
 ### 📸 界面
@@ -44,7 +47,11 @@
 
 | | |
 |---|---|
-| ![项目详情](doc/images/project-detail.png)<br>项目详情 | 截图取自本地实例（示例内容），浅色主题，1440px 宽度 |
+| ![项目详情](doc/images/project-detail.png)<br>项目详情 | ![后台笔记管理](doc/images/admin-notes.png)<br>后台 · 笔记管理 |
+
+| | |
+|---|---|
+| ![后台笔记编辑](doc/images/admin-editor.png)<br>后台 · 笔记编辑与预览 | 截图取自本地实例（示例内容），浅色主题，1440px 宽度 |
 
 ### 🚀 快速开始
 
@@ -63,6 +70,8 @@ HTTP_ADDR=127.0.0.1:8080 \
 ```
 
 浏览器打开 `http://127.0.0.1:8080/` 即可访问前台。
+
+后台在 `http://127.0.0.1:8080/admin`，用 `ADMIN_INIT_USERNAME` / `ADMIN_INIT_PASSWORD` 登录。初始账号只在 `admin` 表为空时写入一次，之后改密请走「账号设置」页。
 
 **开发者（从源码构建）**
 
@@ -90,6 +99,9 @@ cd web && npm install && npm run dev   # Vite 把 /api 代理到 127.0.0.1:8080
 | 数据库 | SQLite（`modernc.org/sqlite`） | 纯 Go 驱动，无 CGo；WAL + `busy_timeout` + 单连接 |
 | 前端 | Vue 3 + TypeScript + Vite 6 | 组合式 API，无 UI 库 |
 | 路由 | vue-router 4（history 模式） | Go `NoRoute` 回退 `index.html` |
+| Markdown | goldmark + bluemonday | 服务端渲染并白名单净化，前端只渲染净化后的 HTML |
+| 认证 | 签名 Cookie + CSRF 双提交 | 单管理员，无需会话表；改密即让旧会话失效 |
+| 校验 | 自定义 `validate` 包 | 字段规则 + 经营性词汇/下载表述拦截，失败返回字段与建议 |
 | 样式 | 原生 CSS 变量 | 浅色/暗色双主题，`localStorage` 持久化 |
 | 静态资源 | `go:embed` + `embedui` 构建标签 | 默认构建不嵌入，便于本地前后端分离调试 |
 | 构建 | `scripts/build.sh` | 版本一致性校验 + 前端构建 + 静态编译 |
@@ -99,6 +111,8 @@ cd web && npm install && npm run dev   # Vite 把 /api 代理到 127.0.0.1:8080
 - 所有内容存在单个 SQLite 文件（默认 `/app/data/notes.db`），备份即复制文件。
 - 前台无统计脚本、无第三方 CDN、无外部字体、无 Cookie 追踪。
 - 后台为单管理员账号，密码用 bcrypt 哈希存储，明文不落库、不进日志。
+- 会话用 `HttpOnly` 签名 Cookie（`SameSite=Lax`，12 小时），写操作需 CSRF token；连续 5 次密码错误锁定 15 分钟。
+- 正文在服务端渲染并净化：原始 HTML、内联事件、`javascript:` 链接与外链图片都会被移除。
 - 仅记录访问日志所需的最小信息（方法、路径、状态、耗时），不记录请求体与 Cookie。
 
 ### 📁 项目结构
@@ -118,16 +132,20 @@ dev-notes-platform/
 │   ├── main.go            启动、优雅退出、日志
 │   ├── VERSION            版本号唯一来源
 │   └── internal/
-│       ├── api/           路由、公开接口、静态资源回退
-│       ├── auth/          密码哈希与会话（Section 3 接入）
+│       ├── api/           公开接口、管理接口、中间件、静态资源回退
+│       ├── auth/          会话签名、CSRF、登录限流
 │       ├── config/        环境变量与启动校验
 │       ├── model/         领域模型
+│       ├── render/        Markdown 渲染与 HTML 净化
 │       ├── store/         SQLite 迁移与查询
+│       ├── validate/      字段校验与词汇拦截
 │       └── webui/         前端产物嵌入入口
-├── web/                   Vue 前台（正式实现）
-│   ├── src/api.ts         接口封装、类型与格式化
-│   ├── src/router.ts      history 路由
+├── web/                   Vue 前台 + 管理后台
+│   ├── src/api.ts         公开接口封装、类型与格式化
+│   ├── src/admin.ts       管理接口封装、CSRF 注入
+│   ├── src/router.ts      history 路由（含后台）
 │   ├── src/views/         五个前台页面
+│   ├── src/views/admin/   登录、布局、笔记/项目管理、账号设置
 │   ├── src/components/    通用组件
 │   └── vite.config.ts     产物输出到 app/internal/webui/dist
 ├── prototype/             已确认的第一版界面原型（冻结基线）
@@ -147,6 +165,10 @@ dev-notes-platform/
 | 查看项目与关联笔记 | 顶部导航「项目」→ 点击卡片 |
 | 回到源码仓库 | 项目详情页「源码仓库 →」（新窗口打开 GitHub） |
 | 切换浅色/暗色 | 右下角主题按钮，刷新后保持 |
+| 进入后台 | 右上角「后台管理」，或直接访问 `/admin` |
+| 新建/编辑笔记 | 后台「笔记管理」→「新建笔记」，或行内「编辑」 |
+| 预览 Markdown | 编辑页点「预览」，走服务端渲染管线 |
+| 修改密码 | 后台「账号设置」，当前页面会自动续期 |
 | 构建可交付二进制 | `bash scripts/build.sh` |
 | 跑后端测试 | `cd app && go test ./... -count=1` |
 
@@ -159,13 +181,17 @@ dev-notes-platform/
 | 前端请求 `/api` 失败 | 开发时确认 Vite 代理与后端端口一致（默认 `127.0.0.1:8080`） |
 | 启动报「SESSION_SECRET 至少需要 32 个字符」 | 换成长度 ≥32 的随机串 |
 | 启动报「管理员账号必须同时设置」 | `ADMIN_INIT_USERNAME` 与 `ADMIN_INIT_PASSWORD` 成对设置 |
-| 后台入口点不到 | v1.1.0 暂未开放 `/admin` 入口，Section 3 接入认证后恢复 |
-| 笔记正文没有排版 | Markdown 渲染在 Section 3 接入，当前按空行分段显示纯文本 |
+| 后台一直跳登录页 | 会话过期（12 小时）或改过密码；重新登录即可 |
+| 登录提示「账号或密码不正确」 | 初始账号只在首次启动且 `admin` 表为空时写入；确认启动时带了 `ADMIN_INIT_*` |
+| 登录提示「失败次数过多」 | 连续 5 次密码错误会锁定 15 分钟，等待或重启进程（计数在内存中） |
+| 保存提示「请求校验失败」 | CSRF token 过期，刷新页面后重新提交 |
+| 保存被拒绝且列出命中词 | 内容含经营性词汇或下载类表述，按提示改为「源码仓库」等合规表述 |
+| 正文里的图片不显示 | 只允许 `/assets/` 站内路径，外链图片会被净化移除 |
 | 项目卡片显示 0 篇关联笔记 | 该项目的笔记尚未发布；`note_count` 只统计 `published` |
 
 ### 📜 更新日志
 
-当前版本 **v1.1.0**（Section 2：正式前台接入真实 API、history 路由、静态资源 embed、构建脚本）。
+当前版本 **v1.2.0**（Section 3：后台管理与认证、内容前置校验、Markdown 渲染净化）。
 
 逐版本明细详见 [CHANGELOG.md](CHANGELOG.md)。
 
@@ -177,25 +203,26 @@ dev-notes-platform/
 
 ### What is this
 
-A personal, non-commercial developer-notes site: Markdown-style notes are the main content, projects act only as an index, and links point to GitHub source repositories instead of hosting any binaries. The public site is read-only — no registration, comments, or submissions; a single admin maintains content via `/admin` (coming in Section 3).
+A personal, non-commercial developer-notes site: Markdown notes are the main content, projects act only as an index, and links point to GitHub source repositories instead of hosting any binaries. The public site is read-only — no registration, comments, or submissions; a single admin maintains content through `/admin`.
 
 ### Tech Stack
 
-Go 1.27 + Gin + SQLite (`modernc.org/sqlite`, pure Go) on the backend, Vue 3 + TypeScript + Vite 6 on the frontend, plain CSS variables for theming, and the built frontend embedded into the binary with `go:embed` behind the `embedui` build tag.
+Go 1.27 + Gin + SQLite (`modernc.org/sqlite`, pure Go) on the backend, Vue 3 + TypeScript + Vite 6 on the frontend, goldmark + bluemonday for server-side Markdown rendering and sanitizing, plain CSS variables for theming, and the built frontend embedded into the binary with `go:embed` behind the `embedui` build tag.
 
 ### Quick Start
 
 ```bash
 bash scripts/build.sh            # builds web + static Go binary -> app/build/dev-notes
 cd app && DATA_DIR=/tmp/dn-data SESSION_SECRET=0123456789abcdef0123456789abcdef \
+  ADMIN_INIT_USERNAME=admin ADMIN_INIT_PASSWORD=admin12345678 \
   HTTP_ADDR=127.0.0.1:8080 ./build/dev-notes
 ```
 
-Open `http://127.0.0.1:8080/`. For development run `cd app && go run .` and `cd web && npm run dev` (Vite proxies `/api` to port 8080).
+Open `http://127.0.0.1:8080/` for the public site and `/admin` for the console. For development run `cd app && go run .` and `cd web && npm run dev` (Vite proxies `/api` to port 8080).
 
 ### Data & Privacy
 
-Content lives in a single SQLite file, so backups are a file copy. No analytics, no CDN, no external fonts, no tracking cookies. The admin password is stored as a bcrypt hash and never logged.
+Content lives in a single SQLite file, so backups are a file copy. No analytics, no CDN, no external fonts, no tracking cookies. The admin password is stored as a bcrypt hash and never logged; sessions use a signed `HttpOnly` cookie with CSRF tokens on writes, and Markdown is sanitized server-side (raw HTML, inline handlers, `javascript:` links and external images are stripped).
 
 ### License
 

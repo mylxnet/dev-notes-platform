@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"io/fs"
@@ -11,23 +12,29 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"dev-notes-platform/internal/auth"
+	"dev-notes-platform/internal/model"
 	"dev-notes-platform/internal/store"
 	"dev-notes-platform/internal/webui"
 )
 
+// 管理接口请求体上限 1 MB。
+const maxAdminBody = 1 << 20
+
 // Server 持有 API 依赖。
 type Server struct {
 	store   *store.Store
+	auth    *auth.Manager
 	version string
 }
 
 // New 构建 Gin 路由。
-func New(st *store.Store, version string) *gin.Engine {
+func New(st *store.Store, version string, sessions *auth.Manager) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
 	router.Use(gin.Recovery(), requestID(), securityHeaders())
 
-	server := &Server{store: st, version: version}
+	server := &Server{store: st, auth: sessions, version: version}
 
 	router.GET("/healthz", server.health)
 
@@ -37,13 +44,70 @@ func New(st *store.Store, version string) *gin.Engine {
 	api.GET("/notes", server.listNotes)
 	api.GET("/notes/:slug", server.getNote)
 
+	// 登录不需要会话，也不校验 CSRF。
+	api.POST("/admin/login", bodyLimit(maxAdminBody), server.adminLogin)
+
+	loadAdmin := func(ctx context.Context, id int64) (*model.Admin, error) {
+		return st.GetAdminByID(ctx, id)
+	}
+	admin := api.Group("/admin",
+		bodyLimit(maxAdminBody),
+		server.auth.RequireAdmin(loadAdmin),
+		server.csrfGuard(),
+	)
+	admin.POST("/logout", server.adminLogout)
+	admin.GET("/me", server.adminMe)
+	admin.PUT("/password", server.adminChangePassword)
+	admin.POST("/preview", server.adminPreview)
+
+	admin.GET("/notes", server.adminListNotes)
+	admin.GET("/notes/:id", server.adminGetNote)
+	admin.POST("/notes", server.adminCreateNote)
+	admin.PUT("/notes/:id", server.adminUpdateNote)
+	admin.DELETE("/notes/:id", server.adminDeleteNote)
+
+	admin.GET("/projects", server.adminListProjects)
+	admin.POST("/projects", server.adminCreateProject)
+	admin.PUT("/projects/:id", server.adminUpdateProject)
+	admin.DELETE("/projects/:id", server.adminDeleteProject)
+
 	router.NoRoute(noRouteHandler(webui.FS()))
 
 	return router
 }
 
+// csrfGuard 校验管理端写操作的双提交 token。
+func (s *Server) csrfGuard() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		switch c.Request.Method {
+		case http.MethodGet, http.MethodHead, http.MethodOptions:
+			c.Next()
+			return
+		}
+		if err := s.auth.VerifyCSRF(c); err != nil {
+			respondError(c, http.StatusForbidden, "CSRF_FAILED", "请求校验失败，请刷新页面后重试")
+			return
+		}
+		c.Next()
+	}
+}
+
+// bodyLimit 拒绝超限请求体，避免大字段拖垮服务。
+func bodyLimit(max int64) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if c.Request.ContentLength > max {
+			respondError(c, http.StatusRequestEntityTooLarge, "PAYLOAD_TOO_LARGE", "请求内容过大")
+			return
+		}
+		if c.Request.Body != nil {
+			c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, max)
+		}
+		c.Next()
+	}
+}
+
 // noRouteHandler 处理接口 404、静态资源与 SPA 回退。
-// 前端使用 history 路由，/notes/:slug 这类真实路径需要回退到 index.html。
+// 前端使用 history 路由，/notes/:slug、/admin/notes 这类真实路径需要回退到 index.html。
 func noRouteHandler(staticFS fs.FS) gin.HandlerFunc {
 	var fileServer http.Handler
 	var indexHTML []byte

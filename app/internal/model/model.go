@@ -45,11 +45,13 @@ type ProjectSummary struct {
 
 // Note 对应 note 表。
 type Note struct {
-	ID          int64           `json:"id"`
-	Title       string          `json:"title"`
-	Slug        string          `json:"slug"`
-	Summary     string          `json:"summary"`
-	Content     string          `json:"content,omitempty"`
+	ID      int64  `json:"id"`
+	Title   string `json:"title"`
+	Slug    string `json:"slug"`
+	Summary string `json:"summary"`
+	Content string `json:"content,omitempty"`
+	// ContentHTML 是服务端渲染并净化后的正文，只出现在前台详情接口。
+	ContentHTML string          `json:"content_html,omitempty"`
 	ProjectID   *int64          `json:"project_id,omitempty"`
 	Project     *ProjectSummary `json:"project,omitempty"`
 	Status      Status          `json:"status"`

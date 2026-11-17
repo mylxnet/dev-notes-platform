@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"dev-notes-platform/internal/render"
 	"dev-notes-platform/internal/store"
 )
 
@@ -87,6 +88,9 @@ func (s *Server) getNote(c *gin.Context) {
 		respondError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "笔记详情加载失败")
 		return
 	}
+	// 前台只拿净化后的 HTML，正文源码不进公开响应。
+	note.ContentHTML = render.Markdown(note.Content)
+	note.Content = ""
 	respondOK(c, note)
 }
 

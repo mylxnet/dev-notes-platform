@@ -28,8 +28,10 @@ export interface Note {
   title: string
   slug: string
   summary: string
-  /** 列表接口不返回正文，仅详情接口返回。 */
+  /** 列表接口不返回正文，仅后台详情返回 Markdown 原文。 */
   content?: string
+  /** 前台详情接口返回服务端渲染并净化后的 HTML。 */
+  content_html?: string
   project_id?: number
   project?: ProjectSummary
   status: ContentStatus
@@ -52,34 +54,69 @@ export interface ProjectDetail {
 }
 
 interface ErrorBody {
-  error?: { code?: string; message?: string }
+  error?: {
+    code?: string
+    message?: string
+    field?: string
+    hits?: string[]
+    suggestion?: string
+  }
 }
 
 interface DataBody<T> {
   data?: T
 }
 
+/** 校验失败时后端附带的定位信息。 */
+export interface ApiErrorExtra {
+  field?: string
+  hits?: string[]
+  suggestion?: string
+}
+
 /** 接口错误：带上 HTTP 状态码与后端错误码，便于页面区分「未找到」与「服务异常」。 */
 export class ApiError extends Error {
   readonly status: number
   readonly code: string
+  readonly field?: string
+  readonly hits?: string[]
+  readonly suggestion?: string
 
-  constructor(message: string, status: number, code = '') {
+  constructor(message: string, status: number, code = '', extra: ApiErrorExtra = {}) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.code = code
+    this.field = extra.field
+    this.hits = extra.hits
+    this.suggestion = extra.suggestion
   }
 }
 
 const baseUrl = (import.meta.env.VITE_API_BASE ?? '').replace(/\/+$/, '')
 
-async function request<T>(path: string, signal?: AbortSignal): Promise<T> {
+interface RequestOptions {
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE'
+  body?: unknown
+  signal?: AbortSignal
+  headers?: Record<string, string>
+}
+
+/** 统一请求封装：JSON 编解码、错误归一化、可选取消与管理端自定义头。 */
+export async function requestJSON<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const headers: Record<string, string> = { Accept: 'application/json', ...options.headers }
+  if (options.body !== undefined) {
+    headers['Content-Type'] = 'application/json'
+  }
+
   let response: Response
   try {
     response = await fetch(`${baseUrl}${path}`, {
-      headers: { Accept: 'application/json' },
-      signal
+      method: options.method ?? 'GET',
+      headers,
+      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      credentials: 'same-origin',
+      signal: options.signal
     })
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
@@ -91,10 +128,12 @@ async function request<T>(path: string, signal?: AbortSignal): Promise<T> {
   const body = (await response.json().catch(() => null)) as (DataBody<T> & ErrorBody) | null
 
   if (!response.ok) {
+    const detail = body?.error
     throw new ApiError(
-      body?.error?.message ?? `请求失败（HTTP ${response.status}）`,
+      detail?.message ?? `请求失败（HTTP ${response.status}）`,
       response.status,
-      body?.error?.code ?? 'HTTP_ERROR'
+      detail?.code ?? 'HTTP_ERROR',
+      { field: detail?.field, hits: detail?.hits, suggestion: detail?.suggestion }
     )
   }
   if (!body || !('data' in body)) {
@@ -114,22 +153,22 @@ export function fetchNotes(
   if (params.page && params.page > 1) query.set('page', String(params.page))
   if (params.pageSize) query.set('page_size', String(params.pageSize))
   const suffix = query.toString()
-  return request<PagedNotes>(`/api/notes${suffix ? `?${suffix}` : ''}`, signal)
+  return requestJSON<PagedNotes>(`/api/notes${suffix ? `?${suffix}` : ''}`, { signal })
 }
 
 /** 查询单篇已发布笔记。 */
 export function fetchNote(slug: string, signal?: AbortSignal): Promise<Note> {
-  return request<Note>(`/api/notes/${encodeURIComponent(slug)}`, signal)
+  return requestJSON<Note>(`/api/notes/${encodeURIComponent(slug)}`, { signal })
 }
 
 /** 查询已发布项目列表。 */
 export function fetchProjects(signal?: AbortSignal): Promise<{ items: Project[]; total: number }> {
-  return request<{ items: Project[]; total: number }>('/api/projects', signal)
+  return requestJSON<{ items: Project[]; total: number }>('/api/projects', { signal })
 }
 
 /** 查询项目详情及其已发布笔记。 */
 export function fetchProject(slug: string, signal?: AbortSignal): Promise<ProjectDetail> {
-  return request<ProjectDetail>(`/api/projects/${encodeURIComponent(slug)}`, signal)
+  return requestJSON<ProjectDetail>(`/api/projects/${encodeURIComponent(slug)}`, { signal })
 }
 
 /** 把后端返回的 RFC3339 时间格式化为 YYYY-MM-DD，空值返回空串。 */

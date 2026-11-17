@@ -1,8 +1,8 @@
 # 技术方案 · 我的开发笔记
 
-> v1.1.0 · by Mr lin · 2026-11-17
+> v1.2.0 · by Mr lin · 2026-11-17
 >
-> 依据：`doc/DESIGN.md` v1.1.0、已确认的 `prototype/` 第一版界面。本文档是后续编码、测试、部署的实施依据，代码实现与本文档不一致时，以本文档评审结论为准。
+> 依据：`doc/DESIGN.md` v1.2.0、已确认的 `prototype/` 第一版界面。本文档是后续编码、测试、部署的实施依据，代码实现与本文档不一致时，以本文档评审结论为准。
 
 ## 一、方案目标与范围
 
@@ -49,7 +49,7 @@
 |---|---|---|
 | Section 1 | 已完成（2026-11-17） | Go 模块、配置、SQLite 迁移、数据模型、Store、公开 API、健康检查、单元与接口测试 |
 | Section 2 | 已完成（2026-11-17） | 前台正式页面接入真实 API、history 路由与 SPA 回退、静态资源 embed、构建脚本 |
-| Section 3 | 待开始 | 后台登录、管理 API、认证、前置校验 |
+| Section 3 | 已完成（2026-11-17） | 后台登录与管理界面、认证会话、CSRF、前置校验、Markdown 渲染净化 |
 | Section 4 | 待开始 | 真实内容录入 |
 | Section 5 | 待开始 | Docker、1Panel、端到端验收 |
 
@@ -292,6 +292,8 @@ type NoteRepo interface {
 - 登录失败限流：同一 IP 15 分钟内最多 5 次失败，超出返回 429；成功登录清零。
 - 登录响应不区分“账号不存在”和“密码错误”，统一提示“账号或密码不正确”。
 
+v1.2.0 实现位置：`internal/auth/auth.go`。签名为 `base64url(payload) + "." + base64url(HMAC-SHA256(payload))`，解析时用 `hmac.Equal` 常数时间比较，并逐字段校验版本号、过期时间与 `admin.updated_at`。CSRF token 为 32 字节随机数（base64url），存于非 HttpOnly 的 `dn_csrf`，前端从 `/api/admin/me` 或登录响应取回。限流为进程内 map，按 `c.ClientIP()` 计数。
+
 ### 5.7 中间件
 
 | 中间件 | 作用 |
@@ -303,6 +305,8 @@ type NoteRepo interface {
 | `Auth` | 校验会话 Cookie，失败返回 401 |
 | `CSRF` | 管理端写操作校验 `Origin` 同源 + `X-CSRF-Token` 双提交 |
 | `BodyLimit` | 管理端请求体上限 1 MB |
+
+v1.2.0 实现位置：`internal/api/router.go`（`requestID`、`securityHeaders`、`bodyLimit`、`csrfGuard`、`auth.RequireAdmin`）。`Auth` 与 `CSRF` 只挂在 `/api/admin` 受保护分组上，`POST /api/admin/login` 单独注册、不校验会话。`CSRF` 仅校验非 GET/HEAD/OPTIONS 方法。`AccessLog` 尚未独立实现，访问日志由进程日志与反向代理承担（列入 Section 5）。
 
 ### 5.8 校验与内容安全
 
@@ -345,6 +349,8 @@ Markdown 渲染管线：
 4. `bluemonday` 按白名单净化，移除 `script`、`iframe`、`style`、事件属性。
 5. 输出 HTML 存入响应字段 `content_html`，前端仅对净化后的 HTML 使用 `v-html`。
 
+v1.2.0 实现位置：字段规则与词汇拦截在 `internal/validate`，渲染管线在 `internal/render`。要点：① 未启用 `html.WithUnsafe()`，Markdown 中的原始 HTML 被丢弃；② `bluemonday` 使用 `NewPolicy()` 手写白名单，必须调用 `AllowRelativeURLs(true)`，否则 `/assets/` 图片与站内链接会被清空；③ 图片 `src` 用正则限定 `^/assets/`，外链图片（含追踪像素）会被移除；④ 代码块 `class="language-*"` 单独放行，其余 class 丢弃；⑤ 预览接口与管理端保存走同一渲染函数，避免预览与实际不一致。
+
 ### 5.9 API 契约
 
 统一响应：
@@ -384,6 +390,8 @@ Markdown 渲染管线：
 | PUT | `/api/admin/projects/{id}` | 更新项目 |
 | DELETE | `/api/admin/projects/{id}` | 删除项目 |
 | PUT | `/api/admin/password` | 修改密码 |
+| GET | `/api/admin/notes/{id}` | 单篇笔记（含 Markdown 原文，编辑用） |
+| POST | `/api/admin/preview` | Markdown 预览，返回净化后的 HTML |
 
 状态码：
 
@@ -433,7 +441,7 @@ Markdown 渲染管线：
 
 - 结构化 JSON 日志：`time`、`level`、`request_id`、`method`、`path`、`status`、`latency_ms`。
 - 不记录密码、Cookie、CSRF Token、完整请求体。
-- `GET /healthz` 返回 `{"status":"ok","db":"ok","version":"1.1.0"}`，数据库不可用时返回 503。
+- `GET /healthz` 返回 `{"status":"ok","db":"ok","version":"1.2.0"}`，数据库不可用时返回 503。
 
 ### 5.12 错误处理原则
 
@@ -448,8 +456,9 @@ Markdown 渲染管线：
 - Vue 3 + TypeScript + Vite，单 SPA，history 路由。
 - 以 `prototype/` 第一版为视觉基线，拆分为正式组件。
 - 不引入 UI 组件库；使用原生 CSS 变量与语义化类名，减少依赖。
-- `web/src/api.ts` 统一封装 `fetch`：JSON 解析、错误归一化为 `ApiError`（含 `status` / `code`）、`AbortSignal` 取消。
-- 不引入 Pinia；列表状态留在页面内（`ref` + `onMounted`），会话状态在 Section 3 用 `useAuth` composable。
+- `web/src/api.ts` 统一封装 `fetch`：JSON 解析、错误归一化为 `ApiError`（含 `status` / `code` / `field` / `hits` / `suggestion`）、`AbortSignal` 取消。
+- `web/src/admin.ts` 封装管理端接口：自动注入 `X-CSRF-Token`，401 时清空 token 并回调路由跳转登录。
+- 不引入 Pinia；列表状态留在页面内（`ref` + `onMounted`），CSRF token 与当前管理员放在 `admin.ts` 模块级变量，页面刷新后由 `/api/admin/me` 重新取回。
 
 ### 6.2 路由
 
@@ -461,12 +470,16 @@ Markdown 渲染管线：
 | `/projects` | 项目索引 | 无 |
 | `/projects/:slug` | 项目详情 | 无 |
 | `/about` | 关于 | 无 |
-| `/admin/login` | 后台登录（Section 3） | 无 |
-| `/admin/notes` | 笔记管理（Section 3） | 是 |
-| `/admin/projects` | 项目管理（Section 3） | 是 |
-| `/admin/account` | 账号设置（Section 3） | 是 |
+| `/admin/login` | 后台登录 | 无 |
+| `/admin/notes` | 笔记管理 | 是 |
+| `/admin/notes/new` | 新建笔记 | 是 |
+| `/admin/notes/:id/edit` | 编辑笔记 | 是 |
+| `/admin/projects` | 项目管理 | 是 |
+| `/admin/projects/new` | 新建项目 | 是 |
+| `/admin/projects/:id/edit` | 编辑项目 | 是 |
+| `/admin/account` | 账号设置 | 是 |
 
-注：v1.1.0 只注册前六个公开路由，其余路径重定向到 `/`。后台路由与守卫在 Section 3 接入：访问 `/admin/*`（登录页除外）时调用 `/api/admin/me`，401 跳转登录并记录 `redirect` 参数。
+后台守卫在 `AdminLayout` 挂载时执行：调用 `/api/admin/me`，401 则跳转 `/admin/login?redirect=<当前路径>`。登录成功后回跳 `redirect`（仅接受以 `/admin` 开头的路径）。
 
 ### 6.3 组件清单
 
@@ -480,11 +493,11 @@ Markdown 渲染管线：
 | 骨架屏（`.skeleton-block` + `.skeleton-line`） | 列表与详情加载态 | 已实现 |
 | 错误横幅（`.error-banner`） | 接口错误提示与重试 | 已实现 |
 | `ProjectCard` | 项目索引项，技术栈、关联笔记数、源码外链 | 页面内联 |
-| `ConfirmDialog` | 删除确认，禁止误操作 | Section 3 |
-| `AdminLayout` | 后台侧栏、顶栏、退出登录 | Section 3 |
-| `NoteEditor` | 笔记表单、Markdown 预览、保存前校验 | Section 3 |
-| `ProjectEditor` | 项目表单、排序与状态 | Section 3 |
-| `PasswordForm` | 修改密码与二次确认 | Section 3 |
+| 行内删除确认 | 表格行内「删除 → 确认删除 / 取消」，替代弹窗 | 已实现 |
+| `AdminLayout` | 后台侧栏、顶栏、退出登录、会话校验 | 已实现 |
+| `AdminNoteEditView` | 笔记表单、Markdown 预览、字段级错误定位、未保存离开提示 | 已实现 |
+| `AdminProjectEditView` | 项目表单、技术栈输入、排序与状态 | 已实现 |
+| `AdminAccountView` | 修改密码与二次确认 | 已实现 |
 
 ### 6.4 视觉与交互规范
 
@@ -499,7 +512,7 @@ Markdown 渲染管线：
 | 动效 | 仅 `transform` / `opacity`；150–300ms；尊重 `prefers-reduced-motion` |
 | 状态 | 每个列表必须提供加载、空、错误三态 |
 | 反馈 | 保存按钮提交中禁用并显示“保存中”；删除必须二次确认 |
-| 版本 | 页脚与后台侧栏显示 `v1.1.0 by Mr lin`，版本号在署名之前 |
+| 版本 | 页脚、后台侧栏与登录页显示 `v1.2.0 by Mr lin`，版本号在署名之前 |
 
 ### 6.5 后台交互
 
@@ -538,7 +551,7 @@ Markdown 渲染管线：
 
 ### 7.2 构建脚本
 
-`scripts/build.sh` 步骤（v1.1.0 已实现前 4 步，镜像打包在 Section 5 补入）：
+`scripts/build.sh` 步骤（v1.2.0 已实现前 4 步，镜像打包在 Section 5 补入）：
 
 1. 读取版本号：`app/VERSION`。
 2. 版本一致性校验：`app/main.go` 的 `var version` 必须与 `app/VERSION` 相同，否则立即失败。
@@ -585,7 +598,7 @@ ENTRYPOINT ["/app/dev-notes"]
 ```yaml
 services:
   dev-notes:
-    image: dev-notes:1.1.0
+    image: dev-notes:1.2.0
     container_name: dev-notes
     restart: unless-stopped
     ports:
@@ -707,7 +720,21 @@ v1.1.0 已执行（2026-11-17，Playwright + 本机 Chrome，临时库 3 项目 
 | 项目详情 | 技术栈、关联笔记、源码仓库外链正常 |
 | 控制台 | 无 JS 异常（仅不存在笔记的接口 404，属预期） |
 
-尚未覆盖（后续 Section 补齐）：移动端 390px、暗色主题截图、后台登录与管理模块。
+v1.2.0 已执行（2026-11-17，Playwright + 本机 Chrome，通过 WSL 实例 IP 访问）：
+
+| 场景 | 实际结果 |
+|---|---|
+| 未登录访问 `/admin/notes` | 跳转 `/admin/login?redirect=/admin/notes` |
+| 登录 | 成功，进入笔记列表（3 行） |
+| 新建笔记 | 保存成功，回列表可见；前台访问该 slug 正常 |
+| 前台 Markdown | `h2=1`、`pre>code=1`、`li=2`，排版正常 |
+| 内容拦截 | 正文含「网盘地址 / 获取安装包」→ 显示命中词与修正建议，未保存 |
+| 项目管理 | 3 行、7 列表头（名称/标识/技术栈/状态/笔记/排序/操作） |
+| 删除笔记 | 二次确认后删除，列表不再出现 |
+| 修改密码 | 提示「密码已更新，当前会话已自动续期」，旧会话失效 |
+| 控制台 | 无异常（未登录探测的 401 属预期） |
+
+尚未覆盖（后续补齐）：移动端 390px、暗色主题截图、图片上传。
 
 ### 8.5 安全测试清单
 
@@ -720,6 +747,8 @@ v1.1.0 已执行（2026-11-17，Playwright + 本机 Chrome，临时库 3 项目 
 | 未登录访问 `/admin/notes` | 前端跳登录，接口 401 |
 | 登录暴力尝试 | 限流生效 |
 | 错误页面 | 不泄露堆栈与路径 |
+
+v1.2.0 已由单元/接口测试覆盖：`<script>` 与 `onerror` 被净化、`javascript:` 链接被移除、外链图片被移除、未登录访问管理接口 401、缺少 `X-CSRF-Token` 返回 403、改密后旧 Cookie 401、登录连续 5 次失败后 429。跨站表单与 Origin 校验、Cookie 属性检查列入 Section 5 部署后验证。
 
 ### 8.6 部署测试
 
@@ -743,7 +772,7 @@ v1.1.0 已执行（2026-11-17，Playwright + 本机 Chrome，临时库 3 项目 
 |---|---|---|---|---|
 | Section 1 | Go 骨架、配置、SQLite、迁移、模型、Store、健康检查 | 可启动二进制 | `go test ./...` 通过，`/healthz` 200 | 2 人日 |
 | Section 2 | 公开 API、Vue 前台 6 页、embed、主题（已完成） | 可浏览前台 | 浏览器 6 页通过，草稿不可见 | 2 人日 |
-| Section 3 | 登录、会话、CSRF、管理 API、后台 4 模块、前置校验 | 可维护内容 | 登录/CRUD/校验/401 通过 | 3 人日 |
+| Section 3 | 登录、会话、CSRF、管理 API、后台 4 模块、前置校验（已完成） | 可维护内容 | 登录/CRUD/校验/401 通过 | 3 人日 |
 | Section 4 | 真实内容录入、SEO 标题、合规文案、备案位 | 6 项目 + 5 笔记 | 内容与备案边界一致 | 1 人日 |
 | Section 5 | Docker、Compose、1Panel、端到端验收、文档 | 可部署镜像与发布包 | 重启数据不丢，浏览器验收通过 | 1 人日 |
 
@@ -777,6 +806,7 @@ v1.1.0 已执行（2026-11-17，Playwright + 本机 Chrome，临时库 3 项目 
 
 | 版本 | 日期 | 变更 |
 |---|---|---|
+| v1.2.0 | 2026-11-17 | 完成 Section 3：后台管理与认证、CSRF、登录限流、内容前置校验、Markdown 渲染净化、前台正文服务端渲染 |
 | v1.1.0 | 2026-11-17 | 完成 Section 2：正式前台接入真实 API、history 路由与 SPA 回退、静态资源 embed、构建脚本与浏览器验收 |
 | v1.0.3 | 2026-11-17 | 完成 Section 1：Go 骨架、SQLite 迁移、数据模型、Store、公开 API、健康检查与测试 |
 | v1.0.2 | 2026-11-17 | 确认第一版界面方案；新增详细技术方案 `doc/PROJECT.md`；同步版本与文档 |
