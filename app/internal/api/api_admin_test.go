@@ -35,7 +35,7 @@ func newAdminTestServer(t *testing.T) http.Handler {
 		t.Fatalf("seed admin: %v", err)
 	}
 
-	return New(st, "test", auth.NewManager(strings.Repeat("t", 32), false))
+	return New(st, "test", auth.NewManager(strings.Repeat("t", 32), auth.CookieSecureNever))
 }
 
 func doJSON(t *testing.T, router http.Handler, method, path, payload string, cookies []*http.Cookie, csrf string) *httptest.ResponseRecorder {

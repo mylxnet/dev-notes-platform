@@ -51,16 +51,29 @@ type Claims struct {
 	AdminUpdatedAt int64
 }
 
+// CookieSecureMode 决定会话 Cookie 是否带 Secure 标记。
+// Secure Cookie 在 http:// 下会被浏览器直接丢弃，因此默认按请求协议自动判断。
+type CookieSecureMode string
+
+const (
+	// CookieSecureAuto 直连 TLS 或反代声明 https 时加 Secure，其余情况不加。
+	CookieSecureAuto CookieSecureMode = "auto"
+	// CookieSecureAlways 强制加 Secure，适用于确定全程 HTTPS 的部署。
+	CookieSecureAlways CookieSecureMode = "always"
+	// CookieSecureNever 强制不加 Secure，仅用于内网 http 调试。
+	CookieSecureNever CookieSecureMode = "never"
+)
+
 // Manager 负责会话 cookie、CSRF token 与登录限流。
 type Manager struct {
 	secret  []byte
-	secure  bool
+	secure  CookieSecureMode
 	now     func() time.Time
 	limiter *limiter
 }
 
 // NewManager 创建会话管理器；secret 来自配置且长度已在启动时校验。
-func NewManager(secret string, cookieSecure bool) *Manager {
+func NewManager(secret string, cookieSecure CookieSecureMode) *Manager {
 	return &Manager{
 		secret:  []byte(secret),
 		secure:  cookieSecure,
@@ -94,7 +107,22 @@ func (m *Manager) Clear(c *gin.Context) {
 
 func (m *Manager) writeCookie(c *gin.Context, name, value string, httpOnly bool, maxAge int) {
 	c.SetSameSite(http.SameSiteLaxMode)
-	c.SetCookie(name, value, maxAge, "/", "", m.secure, httpOnly)
+	c.SetCookie(name, value, maxAge, "/", "", m.useSecure(c), httpOnly)
+}
+
+// useSecure 判断本次响应是否给 Cookie 打 Secure 标记。
+// 反向代理终结 TLS 时，内网这一段仍是 http，需要看 X-Forwarded-Proto。
+func (m *Manager) useSecure(c *gin.Context) bool {
+	switch m.secure {
+	case CookieSecureAlways:
+		return true
+	case CookieSecureNever:
+		return false
+	}
+	if c.Request.TLS != nil {
+		return true
+	}
+	return strings.EqualFold(c.GetHeader("X-Forwarded-Proto"), "https")
 }
 
 // Parse 校验会话 cookie 并返回 claims。

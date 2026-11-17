@@ -1,8 +1,8 @@
 # 技术方案 · 我的开发笔记
 
-> v1.3.0 · by Mr lin · 2026-11-17
+> v1.3.1 · by Mr lin · 2026-11-17
 >
-> 依据：`doc/DESIGN.md` v1.3.0、已确认的 `prototype/` 第一版界面。本文档是后续编码、测试、部署的实施依据，代码实现与本文档不一致时，以本文档评审结论为准。
+> 依据：`doc/DESIGN.md` v1.3.1、已确认的 `prototype/` 第一版界面。本文档是后续编码、测试、部署的实施依据，代码实现与本文档不一致时，以本文档评审结论为准。
 
 ## 一、方案目标与范围
 
@@ -188,7 +188,7 @@ dev-notes-platform/
 | `SESSION_SECRET` | 是 | 无 | 至少 32 字节随机串，用于签名 Cookie |
 | `ADMIN_INIT_USERNAME` | 首次启动是 | 无 | 初始管理员账号 |
 | `ADMIN_INIT_PASSWORD` | 首次启动是 | 无 | 初始密码，至少 12 位 |
-| `COOKIE_SECURE` | 否 | `true` | HTTPS 环境为 true；本地调试可 false |
+| `COOKIE_SECURE` | 否 | `auto` | `auto` 按请求协议判断 Secure 标记；`true`/`always` 强制加；`false`/`never` 强制不加；其他取值启动失败 |
 | `TRUSTED_PROXY` | 否 | 空 | 反向代理 IP/CIDR，用于取真实客户端 IP |
 | `LOG_LEVEL` | 否 | `info` | `debug` / `info` / `warn` / `error` |
 | `TZ` | 否 | `Asia/Shanghai` | 时间显示时区 |
@@ -288,7 +288,7 @@ type NoteRepo interface {
 - payload：`v1|adminID|expiresUnix|adminUpdatedAtUnix`。
 - 有效期 12 小时；每次请求校验签名、过期时间与 `admin.updated_at`。
 - 修改密码会更新 `admin.updated_at`，旧 Cookie 自动失效。
-- Cookie 属性：`HttpOnly`、`SameSite=Lax`、`Path=/`、`Secure=COOKIE_SECURE`、`Max-Age=43200`。
+- Cookie 属性：`HttpOnly`、`SameSite=Lax`、`Path=/`、`Max-Age=43200`；`Secure` 由 `COOKIE_SECURE` 决定，默认 `auto` —— 直连 TLS 或 `X-Forwarded-Proto: https` 时加，HTTP 直连不加（否则浏览器丢弃 Cookie，登录后立刻 401）。
 - 登录失败限流：同一 IP 15 分钟内最多 5 次失败，超出返回 429；成功登录清零。
 - 登录响应不区分“账号不存在”和“密码错误”，统一提示“账号或密码不正确”。
 
@@ -441,7 +441,7 @@ v1.3.0 实现位置：字段规则与词汇拦截在 `internal/validate`，渲�
 
 - 结构化 JSON 日志：`time`、`level`、`request_id`、`method`、`path`、`status`、`latency_ms`。
 - 不记录密码、Cookie、CSRF Token、完整请求体。
-- `GET /healthz` 返回 `{"status":"ok","db":"ok","version":"1.3.0"}`，数据库不可用时返回 503。
+- `GET /healthz` 返回 `{"status":"ok","db":"ok","version":"1.3.1"}`，数据库不可用时返回 503。
 
 ### 5.12 错误处理原则
 
@@ -512,7 +512,7 @@ v1.3.0 实现位置：字段规则与词汇拦截在 `internal/validate`，渲�
 | 动效 | 仅 `transform` / `opacity`；150–300ms；尊重 `prefers-reduced-motion` |
 | 状态 | 每个列表必须提供加载、空、错误三态 |
 | 反馈 | 保存按钮提交中禁用并显示“保存中”；删除必须二次确认 |
-| 版本 | 页脚、后台侧栏与登录页显示 `v1.3.0 by Mr lin`，版本号在署名之前 |
+| 版本 | 页脚、后台侧栏与登录页显示 `v1.3.1 by Mr lin`，版本号在署名之前 |
 
 ### 6.5 后台交互
 
@@ -598,7 +598,7 @@ ENTRYPOINT ["/app/dev-notes"]
 ```yaml
 services:
   dev-notes:
-    image: dev-notes:1.3.0
+    image: dev-notes:1.3.1
     container_name: dev-notes
     restart: unless-stopped
     ports:
@@ -808,6 +808,7 @@ v1.3.0 补充图片通道用例：`/assets/demo.png` 与 `/media/siteguard-arch.
 
 | 版本 | 日期 | 变更 |
 |---|---|---|
+| v1.3.1 | 2026-11-17 | 修复 HTTP 访问下 Secure Cookie 被丢弃导致后台登录后立即失效；`COOKIE_SECURE` 改为 auto/true/false 三档并新增对应测试 |
 | v1.3.0 | 2026-11-17 | 新增站内配图目录 `/media/`：图片白名单放宽至 `/assets/` 与 `/media/`；正文图片改为等比自适应；新增两张技术插图（SiteGuard 同源判定、mailhub IMAP 游标） |
 | v1.2.0 | 2026-11-17 | 完成 Section 3：后台管理与认证、CSRF、登录限流、内容前置校验、Markdown 渲染净化、前台正文服务端渲染 |
 | v1.1.0 | 2026-11-17 | 完成 Section 2：正式前台接入真实 API、history 路由与 SPA 回退、静态资源 embed、构建脚本与浏览器验收 |

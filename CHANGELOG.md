@@ -6,6 +6,7 @@
 
 | 版本 | 日期 | 摘要 |
 |---|---|---|
+| v1.3.1 | 2026-11-17 | 修复 HTTP 访问下 Secure Cookie 被丢弃导致后台登录后立即失效 |
 | v1.3.0 | 2026-11-17 | 新增站内配图目录 `/media/` 与两张技术插图，正文图片按容器等比缩放 |
 | v1.2.0 | 2026-11-17 | 完成 Section 3：后台管理与认证、内容校验、Markdown 渲染净化、前台正文改为服务端渲染 |
 | v1.1.0 | 2026-11-17 | 完成 Section 2：正式前台接入真实 API、history 路由、静态资源 embed 与构建脚本 |
@@ -15,6 +16,27 @@
 | v1.0.0 | 2026-11-17 | 初始设计方案 |
 
 ## 详细更新日志（按版本倒序）
+
+### v1.3.1 · 2026-11-17
+
+**新增**
+
+- `COOKIE_SECURE` 改为三档：`auto`（默认）、`true`/`always`、`false`/`never`。`auto` 按请求是否 HTTPS 决定 Secure 标记，同时识别直连 TLS 与反向代理的 `X-Forwarded-Proto: https`。
+- 非法取值（如 `maybe`）在启动阶段直接失败，并提示「COOKIE_SECURE 只能是 auto / true / false」，不进入运行期才暴露。
+
+**优化**
+
+- 反向代理终结 TLS 的部署可以继续给会话 Cookie 保留 `Secure`，不必再用 `COOKIE_SECURE=false` 换取可用性。
+
+**修复**
+
+- 修复用内网 IP 或域名以 HTTP 访问后台时，`Secure` Cookie 被浏览器丢弃、登录后 `/api/admin/me` 立刻返回 401 并被弹回登录页、后台无法新增或修改数据的问题。
+- 同一缺陷也解释了「本地 localhost 测试一律正常」：浏览器把 `localhost` 与 `127.0.0.1` 视为安全上下文，Secure Cookie 照样保存，问题只在换地址后暴露。
+
+**调整**
+
+- 新增测试：`TestSessionCookieSecureFollowsScheme`（auto 下 http/https/反代三种场景 + always/never 强制）、`TestLoadCookieSecureMode`（含非法值启动失败）。
+- 版本统一升至 `v1.3.1`：`app/VERSION`、`app/main.go`、`web/package.json`/lock、页脚、后台侧栏与登录页、文档同步。
 
 ### v1.3.0 · 2026-11-17
 

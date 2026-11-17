@@ -1,10 +1,24 @@
 # 项目状态 · 我的开发笔记
 
-> v1.3.0 · by Mr lin · 2026-11-17
+> v1.3.1 · by Mr lin · 2026-11-17
 
 ## 当前版本
 
-v1.3.0 · Section 3 已完成：后台管理与认证、内容前置校验、Markdown 渲染净化、前台正文改为服务端渲染；本轮补充站内配图通道（`/media/`）与两张技术插图。下一阶段 Section 4（真实内容录入）。
+v1.3.1 · Section 3 已完成：后台管理与认证、内容前置校验、Markdown 渲染净化、前台正文改为服务端渲染；补丁版本补上站内配图通道（`/media/`）与 HTTP 下的会话可用性修复。下一阶段 Section 4（真实内容录入）。
+
+## 本轮改动记录（v1.3.1，2026-11-17）
+
+- `COOKIE_SECURE` 由布尔改为三档：`auto`（默认）/ `true`(always) / `false`(never)，非法值启动即失败。
+- `auth.NewManager` 第二个参数改为 `CookieSecureMode`；新增 `useSecure(c)`：`auto` 下直连 TLS 或请求头 `X-Forwarded-Proto: https` 才加 `Secure`。
+- 现场问题定位：用户以 `http://<内网IP>:端口` 访问后台，登录接口 200 但 `/api/admin/me` 立即 401、Cookie 列表为空 —— 根因是 `Secure` Cookie 在 http 下被浏览器丢弃。
+- 另一条现场问题：`http://127.0.0.1:18080` 打不开，`http://localhost:18080` 正常 —— WSL2 的 localhost 转发只监听 `::1`，IPv4 回环无监听（已记入踩坑表）。
+
+### 验收证据（v1.3.1，2026-11-17）
+
+- `gofmt -l .` 无输出；`go vet ./...` 无输出；`go test ./... -count=1`：`api`、`auth`、`config`、`render`、`store`、`validate` 全部 ok。
+- 新增用例：`TestSessionCookieSecureFollowsScheme`（auto+http 不加 Secure、auto+TLS 加、auto+`X-Forwarded-Proto: https` 加、always 加、never 不加）、`TestLoadCookieSecureMode`（空值/大小写/非法值）。
+- 修复前复现（v1.3.0 二进制）：`http://127.0.0.1:18081` 登录后新建笔记 201 成功；`http://172.25.209.179:18082` 登录后 `/api/admin/me` 401、Cookie 列表为空、弹回登录页。
+- 修复后验证（v1.3.1 二进制，不设 `COOKIE_SECURE` 走默认 auto，`http://172.25.209.179:18083`）：`/healthz` 返回 `version: "1.3.1"`；登录后 URL 落在 `/admin/notes`；Cookie 为 `dn_session`/`dn_csrf` 且均无 Secure；`POST /api/admin/notes` 返回 201；列表中出现新笔记「HTTP 访问验收」。
 
 ## 本轮改动记录（v1.3.0，2026-11-17）
 
@@ -129,6 +143,7 @@ v1.3.0 · Section 3 已完成：后台管理与认证、内容前置校验、Mar
 | D17 | Markdown 在服务端渲染并净化后下发 | 前端不接触原始输入，避免存储型 XSS；预览复用同一管线 |
 | D18 | 会话不落库，用签名 Cookie 携带 `admin.updated_at` | 单管理员无需会话表，改密即让旧会话失效 |
 | D19 | 登录限流用进程内计数 | 单实例部署足够；重启后计数清零可接受 |
+| D20 | `COOKIE_SECURE` 默认 `auto`，按请求协议判断 | 兼顾两类部署：HTTP 直连能登录，反代终结 TLS 时仍保留 Secure；代价是判断依赖 `X-Forwarded-Proto`，代理未透传时按 HTTP 处理（宁可可用，不牺牲登录） |
 
 ## 已知限制
 
@@ -163,6 +178,7 @@ v1.3.0 · Section 3 已完成：后台管理与认证、内容前置校验、Mar
 | 正文里 `/media/xxx.svg` 的图片被净化后 `src` 清空 | 图片白名单仍是 `^/assets/`，`/media/` 不在允许目录内 | 白名单放宽为 `^/(?:assets|media)/`，测试补 `/media/` 正例 | 新增资源目录时要同步检查净化白名单与静态下发两处，只加文件不改白名单等于没生效 |
 | 正文 SVG 插图在窄容器下被压扁变形 | SVG 自带 `width`/`height` 属性，CSS 只写 `max-width: 100%` 不会让高度自适应 | 补 `display: block` 与 `height: auto` | 替换元素（img/svg）缩放宽度的同时必须显式放开高度，否则比例丢失 |
 | 页脚「v1.3.0 by Mr lin」被右下角主题按钮压住 | 主题按钮 `position: fixed`，页脚没有为它预留空间 | 页脚右内边距留 132px，≤600px 改为底部留白 76px | 固定定位元素会覆盖正常流内容，页脚类区域必须预留避让空间 |
+| 用内网 IP 以 http 访问后台，登录后立刻被踢回登录页、无法新增或修改 | `COOKIE_SECURE` 默认 `true`，Cookie 带 `Secure`，HTTP 下被浏览器丢弃 → `/api/admin/me` 401 | `COOKIE_SECURE` 改为三档，默认 `auto` 按请求协议判断（含 `X-Forwarded-Proto`） | Secure Cookie 只在 HTTPS 与 localhost 生效，本机测试通过不代表换地址可用；会话类问题先看 Cookie 是否落盘 |
 | `TestParseRejectsTamperedSession` 时好时坏 | 用例改写 base64url 末位字符，末位含未使用位，解码后字节可能完全相同，篡改等于没改 | 改为改写签名段首字符，保证解码字节必变 | 校验签名的用例不能靠「改一个字符」想当然，要确认改动真的改变了字节 |
 
 ## 待办清单
@@ -181,10 +197,10 @@ v1.3.0 · Section 3 已完成：后台管理与认证、内容前置校验、Mar
 
 | 位置 | 当前值 |
 |---|---|
-| `app/VERSION` / `app/main.go` | `1.3.0` |
-| `web/package.json` / `web/package-lock.json` | `1.3.0` |
-| `web/src/components/SiteFooter.vue` / 后台侧栏 / 登录页 | `v1.3.0 by Mr lin` |
-| `doc/*.md` / `README.md` / `CHANGELOG.md` | `v1.3.0` |
+| `app/VERSION` / `app/main.go` | `1.3.1` |
+| `web/package.json` / `web/package-lock.json` | `1.3.1` |
+| `web/src/components/SiteFooter.vue` / 后台侧栏 / 登录页 | `v1.3.1 by Mr lin` |
+| `doc/*.md` / `README.md` / `CHANGELOG.md` | `v1.3.1` |
 
 `scripts/build.sh` 在编译前校验 `app/main.go` 的 `var version` 与 `app/VERSION` 一致，不一致直接失败。原型工程 `prototype/` 仍为 `v1.0.3`，作为冻结基线不再跟随版本。
 

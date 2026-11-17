@@ -62,7 +62,7 @@ func newTestServer(t *testing.T) http.Handler {
 		t.Fatalf("create draft note: %v", err)
 	}
 
-	return New(st, "test", auth.NewManager(strings.Repeat("t", 32), false))
+	return New(st, "test", auth.NewManager(strings.Repeat("t", 32), auth.CookieSecureNever))
 }
 
 func TestHealth(t *testing.T) {

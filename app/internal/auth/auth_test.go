@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"crypto/tls"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -14,7 +15,7 @@ import (
 )
 
 func testManager() *Manager {
-	return NewManager(strings.Repeat("k", 32), false)
+	return NewManager(strings.Repeat("k", 32), CookieSecureNever)
 }
 
 func newContext(cookies []*http.Cookie) (*gin.Context, *httptest.ResponseRecorder) {
@@ -140,5 +141,49 @@ func TestLoginRateLimit(t *testing.T) {
 	m.ResetLogin(key)
 	if m.LoginLimited(key) {
 		t.Fatal("expected reset")
+	}
+}
+
+func TestSessionCookieSecureFollowsScheme(t *testing.T) {
+	admin := &model.Admin{ID: 1, UpdatedAt: time.Unix(1700000000, 0)}
+
+	cases := []struct {
+		name   string
+		mode   CookieSecureMode
+		proto  string
+		useTLS bool
+		secure bool
+	}{
+		{name: "auto + 直连 http 不加 Secure", mode: CookieSecureAuto, secure: false},
+		{name: "auto + 直连 https 加 Secure", mode: CookieSecureAuto, useTLS: true, secure: true},
+		{name: "auto + 反代声明 https 加 Secure", mode: CookieSecureAuto, proto: "https", secure: true},
+		{name: "always 强制加 Secure", mode: CookieSecureAlways, secure: true},
+		{name: "never 强制不加", mode: CookieSecureNever, useTLS: true, secure: false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			m := NewManager(strings.Repeat("k", 32), tc.mode)
+			c, rec := newContext(nil)
+			if tc.proto != "" {
+				c.Request.Header.Set("X-Forwarded-Proto", tc.proto)
+			}
+			if tc.useTLS {
+				c.Request.TLS = &tls.ConnectionState{}
+			}
+			if _, err := m.Issue(c, admin); err != nil {
+				t.Fatalf("issue: %v", err)
+			}
+
+			cookies := rec.Result().Cookies()
+			if len(cookies) == 0 {
+				t.Fatal("expected cookies")
+			}
+			for _, cookie := range cookies {
+				if cookie.Secure != tc.secure {
+					t.Fatalf("%s 的 Secure 应为 %v，实际 %v", cookie.Name, tc.secure, cookie.Secure)
+				}
+			}
+		})
 	}
 }

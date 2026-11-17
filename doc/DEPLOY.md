@@ -1,6 +1,6 @@
 # 部署手册 · 我的开发笔记
 
-> v1.3.0 · by Mr lin · 2026-11-17
+> v1.3.1 · by Mr lin · 2026-11-17
 
 ## 一、部署前置条件
 
@@ -32,7 +32,7 @@ HTTP_ADDR=127.0.0.1:8080 \
 ./build/dev-notes
 ```
 
-访问 `http://127.0.0.1:8080/` 应看到前台首页；`/admin` 为后台入口，用上面注入的初始账号登录（仅首次启动且 `admin` 表为空时写入）。深路径（如 `/notes/<slug>`、`/admin/notes`）依赖 Go 回退 `index.html`，反向代理需放行全路径。生产环境应设置 `COOKIE_SECURE=true` 并启用 HTTPS，否则会话 Cookie 不会下发。详细构建参数、环境变量与版本注入方式见 `doc/PROJECT.md` 第七节。
+访问 `http://127.0.0.1:8080/` 应看到前台首页；`/admin` 为后台入口，用上面注入的初始账号登录（仅首次启动且 `admin` 表为空时写入）。深路径（如 `/notes/<slug>`、`/admin/notes`）依赖 Go 回退 `index.html`，反向代理需放行全路径。`COOKIE_SECURE` 默认为 `auto`：按请求协议自动决定 Cookie 的 `Secure` 标记，HTTP 直连也能登录，仅在直连 TLS 或代理透传 `X-Forwarded-Proto: https` 时才加 `Secure`；若确定全程 HTTPS，可显式设为 `true` 强制加固。详细构建参数、环境变量与版本注入方式见 `doc/PROJECT.md` 第七节。
 
 ## 三、数据持久化
 
@@ -83,7 +83,8 @@ volumes:
 |---|---|
 | 容器启动即退出 | 数据卷目录权限不足，确认容器用户可写 |
 | 后台登录失败 | 确认初始账号已写入；忘记密码时删除 admin 表记录后重启重建 |
-| 登录后立即跳回登录页 | `COOKIE_SECURE=true` 但当前是 HTTP 访问，浏览器拒收 Cookie；本地调试设 `false` |
+| 登录后立即跳回登录页 | Cookie 未落地：`COOKIE_SECURE=true` 而当前是 HTTP 访问时浏览器会拒收；保持默认 `auto`，或显式设 `false`（仅限内网调试） |
+| Windows 浏览器打不开 `127.0.0.1:端口`，但 `localhost:端口` 正常 | WSL2 的 localhost 转发只监听 `::1`，IPv4 回环无监听；改用 `localhost`，或在 WSL 内以 `0.0.0.0` 绑定后用 WSL 网卡 IP 访问 |
 | 登录提示失败次数过多 | 同一 IP 15 分钟内失败 5 次；等待或重启容器清零（计数在内存） |
 | 保存内容被拒绝并列出命中词 | 内容含经营性词汇或下载类表述，按提示改写为「源码仓库」等合规表述 |
 | 前台显示草稿 | 检查条目状态字段，确认接口只查 published |

@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strconv"
+	"strings"
 )
 
 // Config 保存服务启动所需的全部配置。
@@ -16,9 +16,10 @@ type Config struct {
 	SessionSecret     string
 	AdminInitUsername string
 	AdminInitPassword string
-	CookieSecure      bool
-	LogLevel          string
-	Version           string
+	// CookieSecureMode 取 auto / always / never，默认 auto：按请求协议决定 Secure 标记。
+	CookieSecureMode string
+	LogLevel         string
+	Version          string
 }
 
 // Load 从环境变量读取配置并做启动前校验。
@@ -30,11 +31,16 @@ func Load(version string) (*Config, error) {
 		SessionSecret:     os.Getenv("SESSION_SECRET"),
 		AdminInitUsername: os.Getenv("ADMIN_INIT_USERNAME"),
 		AdminInitPassword: os.Getenv("ADMIN_INIT_PASSWORD"),
-		CookieSecure:      parseBool("COOKIE_SECURE", true),
 		LogLevel:          env("LOG_LEVEL", "info"),
 		Version:           version,
 	}
 	cfg.DBPath = env("DB_PATH", cfg.DataDir+"/notes.db")
+
+	secureMode, err := parseCookieSecure(os.Getenv("COOKIE_SECURE"))
+	if err != nil {
+		return nil, err
+	}
+	cfg.CookieSecureMode = secureMode
 
 	if len(cfg.SessionSecret) < 32 {
 		return nil, errors.New("SESSION_SECRET 至少需要 32 个字符")
@@ -58,16 +64,19 @@ func env(key, fallback string) string {
 	return fallback
 }
 
-func parseBool(key string, fallback bool) bool {
-	value := os.Getenv(key)
-	if value == "" {
-		return fallback
+// parseCookieSecure 把 COOKIE_SECURE 归一化为 auto / always / never。
+// 默认 auto：按请求协议判断 Secure 标记，避免 http 部署下 Cookie 被浏览器丢弃。
+func parseCookieSecure(raw string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "", "auto":
+		return "auto", nil
+	case "true", "1", "yes", "always":
+		return "always", nil
+	case "false", "0", "no", "never":
+		return "never", nil
+	default:
+		return "", fmt.Errorf("COOKIE_SECURE 只能是 auto / true / false，当前为 %q", raw)
 	}
-	parsed, err := strconv.ParseBool(value)
-	if err != nil {
-		return fallback
-	}
-	return parsed
 }
 
 // String 用于启动日志，不包含任何密钥。

@@ -55,7 +55,7 @@ async function onLogout() {
         <RouterLink to="/admin/account">账号设置</RouterLink>
       </nav>
       <div class="admin-side-note">
-        v1.3.0 by Mr lin<br />
+        v1.3.1 by Mr lin<br />
         单管理员账号 · 不开放注册
       </div>
     </aside>

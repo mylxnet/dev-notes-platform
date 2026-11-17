@@ -7,7 +7,7 @@
 [![Backend](https://img.shields.io/badge/Backend-Go%201.27%20%2B%20Gin-00ADD8?logo=go&logoColor=white)](https://go.dev/)
 [![Frontend](https://img.shields.io/badge/Frontend-Vue%203%20%2B%20Vite%206-42b883?logo=vuedotjs&logoColor=white)](https://vuejs.org/)
 [![Database](https://img.shields.io/badge/Database-SQLite-003B57?logo=sqlite&logoColor=white)](https://www.sqlite.org/)
-[![Version](https://img.shields.io/badge/Version-1.3.0-d97757)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.3.1-d97757)](CHANGELOG.md)
 [![Deploy](https://img.shields.io/badge/Deploy-Docker%20%2B%201Panel-2496ED?logo=docker&logoColor=white)](doc/DEPLOY.md)
 
 [English](#english) | [中文](#中文)
@@ -187,13 +187,15 @@ dev-notes-platform/
 | 登录提示「账号或密码不正确」 | 初始账号只在首次启动且 `admin` 表为空时写入；确认启动时带了 `ADMIN_INIT_*` |
 | 登录提示「失败次数过多」 | 连续 5 次密码错误会锁定 15 分钟，等待或重启进程（计数在内存中） |
 | 保存提示「请求校验失败」 | CSRF token 过期，刷新页面后重新提交 |
+| 后台登录成功却立刻跳回登录页 | 会话 Cookie 没落地：保持 `COOKIE_SECURE=auto`（默认），仅在全程 HTTPS 时才设 `true` |
+| Windows 上 `127.0.0.1:端口` 打不开、`localhost:端口` 正常 | WSL2 转发只监听 IPv6 回环，改用 `localhost` 访问 |
 | 保存被拒绝且列出命中词 | 内容含经营性词汇或下载类表述，按提示改为「源码仓库」等合规表述 |
 | 正文里的图片不显示 | 只允许 `/assets/`（前端产物）与 `/media/`（文章插图）站内路径，外链图片会被净化移除 |
 | 项目卡片显示 0 篇关联笔记 | 该项目的笔记尚未发布；`note_count` 只统计 `published` |
 
 ### 📜 更新日志
 
-当前版本 **v1.3.0**（Section 3：后台管理与认证、内容前置校验、Markdown 渲染净化；本轮新增站内配图目录与两张技术插图）。
+当前版本 **v1.3.1**（Section 3：后台管理与认证、内容前置校验、Markdown 渲染净化；本版修复 HTTP 访问下会话 Cookie 被丢弃导致后台无法登录的问题）。
 
 逐版本明细详见 [CHANGELOG.md](CHANGELOG.md)。
 

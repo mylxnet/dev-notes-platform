@@ -41,7 +41,7 @@ async function submit() {
         <h1>只属于一个人的<br />内容管理入口</h1>
         <p>没有注册、没有评论、没有投稿。这里只维护笔记与项目两类内容，保存前会拦截不符合备案边界的表述。</p>
       </div>
-      <div>v1.3.0 by Mr lin</div>
+      <div>v1.3.1 by Mr lin</div>
     </section>
     <section class="login-panel">
       <div class="login-card">
