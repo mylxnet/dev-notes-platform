@@ -84,6 +84,17 @@ func TestPublishedContentFiltering(t *testing.T) {
 	if count != 1 {
 		t.Fatalf("expected 1 published project note, got %d", count)
 	}
+
+	projects, err := st.ListPublishedProjects(ctx)
+	if err != nil {
+		t.Fatalf("list published projects: %v", err)
+	}
+	if len(projects) != 1 {
+		t.Fatalf("expected one published project, got %+v", projects)
+	}
+	if projects[0].NoteCount != 1 {
+		t.Fatalf("expected project note_count=1, got %d", projects[0].NoteCount)
+	}
 }
 
 func TestAdminSeedAndPasswordHash(t *testing.T) {

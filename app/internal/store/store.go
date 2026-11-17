@@ -144,7 +144,9 @@ var schemaStatements = []string{
 	);`,
 }
 
-const projectColumns = `id, name, slug, summary, tech_stack, repo_url, sort_order, status, created_at, updated_at`
+// projectColumns 额外统计已发布笔记数，前台项目卡片据此展示，避免逐个请求详情。
+const projectColumns = `id, name, slug, summary, tech_stack, repo_url, sort_order, status, created_at, updated_at,
+	(SELECT COUNT(*) FROM note WHERE note.project_id = project.id AND note.status = 'published')`
 
 const noteColumns = `n.id, n.title, n.slug, n.summary, n.content, n.project_id, p.name, p.slug, n.status, n.published_at, n.created_at, n.updated_at`
 
@@ -166,6 +168,7 @@ func scanProject(scanner rowScanner) (*model.Project, error) {
 		&project.Status,
 		&createdAt,
 		&updatedAt,
+		&project.NoteCount,
 	); err != nil {
 		return nil, err
 	}

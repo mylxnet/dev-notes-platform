@@ -23,14 +23,16 @@ func (s Status) Valid() bool {
 
 // Project 对应 project 表。
 type Project struct {
-	ID        int64     `json:"id"`
-	Name      string    `json:"name"`
-	Slug      string    `json:"slug"`
-	Summary   string    `json:"summary"`
-	TechStack []string  `json:"tech_stack"`
-	RepoURL   string    `json:"repo_url"`
-	SortOrder int       `json:"sort_order"`
-	Status    Status    `json:"status"`
+	ID        int64    `json:"id"`
+	Name      string   `json:"name"`
+	Slug      string   `json:"slug"`
+	Summary   string   `json:"summary"`
+	TechStack []string `json:"tech_stack"`
+	RepoURL   string   `json:"repo_url"`
+	SortOrder int      `json:"sort_order"`
+	Status    Status   `json:"status"`
+	// NoteCount 是该项目下已发布笔记的数量，由查询统计，不写入 project 表。
+	NoteCount int       `json:"note_count"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }

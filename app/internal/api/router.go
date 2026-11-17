@@ -3,12 +3,16 @@ package api
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"io/fs"
+	"net/http"
+	"path"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 
 	"dev-notes-platform/internal/store"
+	"dev-notes-platform/internal/webui"
 )
 
 // Server 持有 API 依赖。
@@ -33,15 +37,48 @@ func New(st *store.Store, version string) *gin.Engine {
 	api.GET("/notes", server.listNotes)
 	api.GET("/notes/:slug", server.getNote)
 
-	router.NoRoute(func(c *gin.Context) {
-		if strings.HasPrefix(c.Request.URL.Path, "/api/") {
-			respondError(c, 404, "NOT_FOUND", "接口不存在")
-			return
-		}
-		c.String(404, "not found")
-	})
+	router.NoRoute(noRouteHandler(webui.FS()))
 
 	return router
+}
+
+// noRouteHandler 处理接口 404、静态资源与 SPA 回退。
+// 前端使用 history 路由，/notes/:slug 这类真实路径需要回退到 index.html。
+func noRouteHandler(staticFS fs.FS) gin.HandlerFunc {
+	var fileServer http.Handler
+	var indexHTML []byte
+	if staticFS != nil {
+		fileServer = http.FileServer(http.FS(staticFS))
+		indexHTML, _ = fs.ReadFile(staticFS, "index.html")
+	}
+
+	return func(c *gin.Context) {
+		if strings.HasPrefix(c.Request.URL.Path, "/api/") {
+			respondError(c, http.StatusNotFound, "NOT_FOUND", "接口不存在")
+			return
+		}
+
+		if staticFS != nil {
+			requestPath := strings.TrimPrefix(path.Clean(c.Request.URL.Path), "/")
+			if requestPath != "" && requestPath != "." {
+				if info, err := fs.Stat(staticFS, requestPath); err == nil && !info.IsDir() {
+					// 构建产物带内容哈希，可长缓存。
+					if strings.HasPrefix(c.Request.URL.Path, "/assets/") {
+						c.Header("Cache-Control", "public, max-age=31536000, immutable")
+					}
+					fileServer.ServeHTTP(c.Writer, c.Request)
+					return
+				}
+			}
+			if len(indexHTML) > 0 {
+				c.Header("Cache-Control", "no-cache")
+				c.Data(http.StatusOK, "text/html; charset=utf-8", indexHTML)
+				return
+			}
+		}
+
+		c.String(http.StatusNotFound, "not found")
+	}
 }
 
 func requestID() gin.HandlerFunc {

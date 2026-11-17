@@ -6,7 +6,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/gin-gonic/gin"
 
@@ -163,5 +165,75 @@ func TestProjectDetailIncludesPublishedNotes(t *testing.T) {
 	}
 	if body.Data.Project.Slug != "siteguard" || body.Data.NoteCount != 1 || len(body.Data.Notes) != 1 {
 		t.Fatalf("unexpected project detail: %+v", body.Data)
+	}
+}
+
+func TestProjectListIncludesNoteCount(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := newTestServer(t)
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/projects", nil)
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", recorder.Code)
+	}
+	var body struct {
+		Data struct {
+			Items []model.Project `json:"items"`
+			Total int             `json:"total"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode projects: %v", err)
+	}
+	if body.Data.Total != 1 || len(body.Data.Items) != 1 {
+		t.Fatalf("expected one published project, got %+v", body.Data)
+	}
+	if body.Data.Items[0].NoteCount != 1 {
+		t.Fatalf("expected note_count=1, got %+v", body.Data.Items[0])
+	}
+}
+
+func TestStaticAssetsAndSPAFallback(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	staticFS := fstest.MapFS{
+		"index.html":    &fstest.MapFile{Data: []byte("<html>app</html>")},
+		"assets/app.js": &fstest.MapFile{Data: []byte("console.log(1)")},
+	}
+	router := gin.New()
+	router.NoRoute(noRouteHandler(staticFS))
+
+	cases := []struct {
+		path        string
+		wantContent string
+	}{
+		{"/notes/hello", "<html>app</html>"},
+		{"/assets/app.js", "console.log(1)"},
+	}
+	for _, tc := range cases {
+		recorder := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodGet, tc.path, nil)
+		router.ServeHTTP(recorder, request)
+		if recorder.Code != http.StatusOK {
+			t.Fatalf("%s: expected 200, got %d", tc.path, recorder.Code)
+		}
+		if !strings.Contains(recorder.Body.String(), tc.wantContent) {
+			t.Fatalf("%s: unexpected body %q", tc.path, recorder.Body.String())
+		}
+	}
+}
+
+func TestNoStaticAssetsReturns404(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.NoRoute(noRouteHandler(nil))
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/notes/hello", nil)
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 without static assets, got %d", recorder.Code)
 	}
 }

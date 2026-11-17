@@ -6,12 +6,44 @@
 
 | 版本 | 日期 | 摘要 |
 |---|---|---|
+| v1.1.0 | 2026-11-17 | 完成 Section 2：正式前台接入真实 API、history 路由、静态资源 embed 与构建脚本 |
 | v1.0.3 | 2026-11-17 | 完成 Section 1：Go 骨架、SQLite、数据模型、Store、公开 API 与测试 |
 | v1.0.2 | 2026-11-17 | 确认第一版界面方案，新增详细技术方案，同步文档与版本 |
 | v1.0.1 | 2026-11-17 | 新增工程约定文件，完成两版界面原型 |
 | v1.0.0 | 2026-11-17 | 初始设计方案 |
 
 ## 详细更新日志（按版本倒序）
+
+### v1.1.0 · 2026-11-17
+
+**新增**
+
+- 新增 `web/src/api.ts`：公开内容类型、四个公开接口封装、`ApiError` 与日期格式化。
+- 正式前台接入真实 API：首页、笔记列表、笔记详情、项目索引、项目详情全部改为请求后端，不再依赖原型 mock 数据。
+- 笔记列表支持按项目筛选与关键词搜索，请求带 300ms 防抖与 `AbortController` 取消旧请求。
+- 新增加载骨架屏、错误横幅（含重试）、空状态三态展示。
+- 新增 `scripts/build.sh`：版本一致性校验 → 前端构建 → `-tags embedui` 静态编译，产物输出 `app/build/dev-notes`。
+- 新增 `app/internal/webui` 包：以 `embedui` 构建标签把前端产物嵌入二进制；默认构建不嵌入，便于本地用 Vite 开发。
+- 后端项目列表补充 `note_count`（已发布关联笔记数），由 SQL 子查询统计，避免前端逐个请求详情。
+
+**优化**
+
+- 路由由 hash 模式改为 history 模式，Go 侧 `NoRoute` 对非 `/api/` 路径回退 `index.html`（落地 D7）。
+- 静态资源按 `/assets/` 前缀设置一年期不可变缓存，`index.html` 使用 `no-cache`。
+- 笔记详情正文按空行拆分为段落展示，`white-space: pre-wrap` 保留原始换行。
+- 项目详情源码入口改为真实外链 `repo_url`，新窗口打开并带 `noopener noreferrer`。
+
+**修复**
+
+- 移除原型遗留的模拟认证（`auth.ts`）、全局提示（`toast.ts`、`ToastMessage.vue`）与 mock 数据引用，消除构建期模块解析失败。
+- 修正 `base: './'` 在 history 路由下导致 `/notes/:slug` 静态资源 404 的问题，改为 `base: '/'`。
+- 骨架屏容器不再复用 `.note-row` / `.project-card` 类，避免与真实内容混用。
+
+**调整**
+
+- `web/` 由原型工程转为正式前端，包名 `dev-notes-prototype` → `dev-notes-web`。
+- 后台入口暂从站点头部移除，待 Section 3 接入认证后恢复，避免当前出现死链。
+- 版本统一升至 `v1.1.0`：`app/VERSION`、`app/main.go`、`web/package.json`、界面页脚与文档同步。
 
 ### v1.0.3 · 2026-11-17
 
@@ -85,6 +117,7 @@
 
 1. 确认 mailhub 仓库地址与 6 个项目的真实 GitHub 地址。
 2. 确认 5 篇笔记的真实内容来源。
-3. 确认是否初始化 Git 仓库并建立首个提交。
-4. 进入 Section 1：Go 骨架 + SQLite + 数据模型 + 基础 API。
-5. 依次完成 Section 2–5，并按版本同步文档、测试与部署产物。
+3. Section 3：后台管理、登录认证、内容前置校验与 Markdown 渲染。
+4. Section 4：真实内容录入。
+5. Section 5：Docker 镜像、1Panel 部署与线上浏览器验收。
+6. 每个 Section 完成后升小版本、同步文档并提交。

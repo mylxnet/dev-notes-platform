@@ -1,6 +1,6 @@
 # 部署手册 · 我的开发笔记
 
-> v1.0.3 · by Mr lin · 2026-11-17
+> v1.1.0 · by Mr lin · 2026-11-17
 
 ## 一、部署前置条件
 
@@ -18,7 +18,21 @@ cd /mnt/e/app/网站备案/dev-notes-platform
 bash scripts/build.sh
 ```
 
-构建脚本做三件事：构建 Vue 产物到 `web/dist/`、编译 Go 二进制、生成 Docker 镜像。详细构建参数、环境变量与版本注入方式见 `doc/PROJECT.md` 第七节。
+构建脚本做四件事：校验版本一致性（`app/VERSION` 与 `app/main.go`）、安装前端依赖、构建 Vue 产物到 `app/internal/webui/dist`、以 `-tags embedui` 静态编译为 `app/build/dev-notes`。Docker 镜像在 Section 5 补入。
+
+产物可直接运行（已内嵌前端，无需另装 Node）：
+
+```bash
+cd app
+DATA_DIR=/opt/dev-notes/data \
+SESSION_SECRET=<32 位以上随机串> \
+ADMIN_INIT_USERNAME=admin \
+ADMIN_INIT_PASSWORD=<12 位以上> \
+HTTP_ADDR=127.0.0.1:8080 \
+./build/dev-notes
+```
+
+访问 `http://127.0.0.1:8080/` 应看到前台首页；深路径（如 `/notes/<slug>`）依赖 Go 回退 `index.html`，反向代理需放行全路径。详细构建参数、环境变量与版本注入方式见 `doc/PROJECT.md` 第七节。
 
 ## 三、数据持久化
 

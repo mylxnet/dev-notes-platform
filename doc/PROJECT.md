@@ -1,8 +1,8 @@
 # 技术方案 · 我的开发笔记
 
-> v1.0.3 · by Mr lin · 2026-11-17
+> v1.1.0 · by Mr lin · 2026-11-17
 >
-> 依据：`doc/DESIGN.md` v1.0.3、已确认的 `prototype/` 第一版界面。本文档是后续编码、测试、部署的实施依据，代码实现与本文档不一致时，以本文档评审结论为准。
+> 依据：`doc/DESIGN.md` v1.1.0、已确认的 `prototype/` 第一版界面。本文档是后续编码、测试、部署的实施依据，代码实现与本文档不一致时，以本文档评审结论为准。
 
 ## 一、方案目标与范围
 
@@ -48,7 +48,7 @@
 | Section | 状态 | 说明 |
 |---|---|---|
 | Section 1 | 已完成（2026-11-17） | Go 模块、配置、SQLite 迁移、数据模型、Store、公开 API、健康检查、单元与接口测试 |
-| Section 2 | 待开始 | 前台正式页面、embed 静态资源 |
+| Section 2 | 已完成（2026-11-17） | 前台正式页面接入真实 API、history 路由与 SPA 回退、静态资源 embed、构建脚本 |
 | Section 3 | 待开始 | 后台登录、管理 API、认证、前置校验 |
 | Section 4 | 待开始 | 真实内容录入 |
 | Section 5 | 待开始 | Docker、1Panel、端到端验收 |
@@ -129,30 +129,28 @@ dev-notes-platform/
 ├── prototype-v2/              第二版候选（归档，不参与构建）
 ├── app/                       Go 主程序
 │   ├── main.go
-│   ├── embed.go
+│   ├── VERSION                版本号唯一来源
 │   ├── go.mod
 │   └── internal/
-│       ├── api/               路由、处理器、中间件
-│       ├── auth/              密码、会话、CSRF
+│       ├── api/               路由、处理器、中间件、静态资源回退
+│       ├── auth/              密码哈希与会话（Section 3 接入）
 │       ├── config/            环境变量与启动配置
 │       ├── model/             领域模型与 DTO
-│       ├── render/            Markdown 渲染与净化
 │       ├── store/             SQLite 访问与迁移
-│       └── validate/          内容校验与词汇拦截
-├── web/                       Vue 前台 + 管理界面
+│       └── webui/             前端产物嵌入（embedui 构建标签）
+├── web/                       Vue 前台（正式实现）
 │   ├── index.html
 │   ├── package.json
-│   ├── vite.config.ts
+│   ├── vite.config.ts         产物输出到 app/internal/webui/dist
 │   ├── src/
 │   │   ├── main.ts
 │   │   ├── App.vue
-│   │   ├── router.ts
-│   │   ├── api/               请求封装
+│   │   ├── router.ts          history 路由
+│   │   ├── api.ts             接口封装、类型与格式化
+│   │   ├── env.d.ts           Vite 环境与 .vue 模块声明
 │   │   ├── components/        通用组件
 │   │   ├── views/             前台页面
-│   │   ├── views/admin/       后台页面
-│   │   └── styles/            主题与全局样式
-│   └── dist/                  构建产物，Go embed 来源
+│   │   └── styles.css         主题与全局样式
 ├── deploy/
 │   ├── docker-compose.yml
 │   └── .env.example
@@ -264,6 +262,7 @@ CREATE TABLE IF NOT EXISTS admin (
 - `tech_stack` 存 JSON 数组字符串，读取时解析为 `[]string`，最多 10 项。
 - `published_at` 仅在 `status=published` 时必填；转为草稿时保留原值但不展示。
 - 删除项目时笔记不删除，`project_id` 置空，前台显示为“站点记录”。
+- `note_count` 不是表字段，由 `projectColumns` 子查询统计该项目下已发布笔记数，随项目查询一并返回，供前台项目卡片展示。
 
 ### 5.5 Store 接口
 
@@ -351,22 +350,22 @@ Markdown 渲染管线：
 统一响应：
 
 ```json
-{ "data": {}, "meta": {} }
+{ "data": {} }
 ```
 
 统一错误：
 
 ```json
-{ "error": { "code": "VALIDATION_FAILED", "message": "参数校验失败", "field": "slug" } }
+{ "error": { "code": "VALIDATION_FAILED", "message": "参数校验失败" } }
 ```
 
 公开接口：
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/api/notes?project={slug}&page=1&page_size=10&q={kw}` | 已发布笔记列表 |
-| GET | `/api/notes/{slug}` | 已发布笔记详情，含 `content_html` |
-| GET | `/api/projects` | 已发布项目列表 |
+| GET | `/api/notes?project={slug}&page=1&page_size=10&q={kw}` | 已发布笔记列表，`page_size` 上限 50 |
+| GET | `/api/notes/{slug}` | 已发布笔记详情，`content` 为 Markdown 原文（Section 3 接入渲染） |
+| GET | `/api/projects` | 已发布项目列表，每项含计算字段 `note_count` |
 | GET | `/api/projects/{slug}` | 已发布项目详情 + 关联笔记 |
 
 管理接口：
@@ -424,17 +423,17 @@ Markdown 渲染管线：
 
 ### 5.10 静态资源与路由回退
 
-- `//go:embed all:web/dist` 嵌入构建产物。
+- 前端产物输出到 `app/internal/webui/dist`；`embedui` 构建标签下用 `//go:embed all:dist` 嵌入，默认构建不嵌入（见 `doc/PROJECT_STATE.md` D13）。
 - 命中真实文件直接返回；未命中且路径以 `/api/` 开头返回 404 JSON。
 - 其余路径回退到 `index.html`，由 Vue Router 接管。
-- `index.html` 设置 `Cache-Control: no-cache`；带 hash 的静态资源设置长缓存。
+- `index.html` 设置 `Cache-Control: no-cache`；`/assets/` 下带 hash 的静态资源设置 `max-age=31536000, immutable`。
 - 生产环境启用 gzip；如反向代理已压缩则不重复压缩。
 
 ### 5.11 日志与健康检查
 
 - 结构化 JSON 日志：`time`、`level`、`request_id`、`method`、`path`、`status`、`latency_ms`。
 - 不记录密码、Cookie、CSRF Token、完整请求体。
-- `GET /healthz` 返回 `{"status":"ok","db":"ok","version":"1.0.3"}`，数据库不可用时返回 503。
+- `GET /healthz` 返回 `{"status":"ok","db":"ok","version":"1.1.0"}`，数据库不可用时返回 503。
 
 ### 5.12 错误处理原则
 
@@ -449,8 +448,8 @@ Markdown 渲染管线：
 - Vue 3 + TypeScript + Vite，单 SPA，history 路由。
 - 以 `prototype/` 第一版为视觉基线，拆分为正式组件。
 - 不引入 UI 组件库；使用原生 CSS 变量与语义化类名，减少依赖。
-- `web/src/api/` 统一封装 `fetch`：JSON、超时、401 跳转、错误归一化。
-- 不引入 Pinia；会话状态用 `useAuth` composable，列表状态留在页面内。
+- `web/src/api.ts` 统一封装 `fetch`：JSON 解析、错误归一化为 `ApiError`（含 `status` / `code`）、`AbortSignal` 取消。
+- 不引入 Pinia；列表状态留在页面内（`ref` + `onMounted`），会话状态在 Section 3 用 `useAuth` composable。
 
 ### 6.2 路由
 
@@ -462,30 +461,30 @@ Markdown 渲染管线：
 | `/projects` | 项目索引 | 无 |
 | `/projects/:slug` | 项目详情 | 无 |
 | `/about` | 关于 | 无 |
-| `/admin/login` | 后台登录 | 无 |
-| `/admin/notes` | 笔记管理 | 是 |
-| `/admin/projects` | 项目管理 | 是 |
-| `/admin/account` | 账号设置 | 是 |
+| `/admin/login` | 后台登录（Section 3） | 无 |
+| `/admin/notes` | 笔记管理（Section 3） | 是 |
+| `/admin/projects` | 项目管理（Section 3） | 是 |
+| `/admin/account` | 账号设置（Section 3） | 是 |
 
-路由守卫：访问 `/admin/*`（登录页除外）时调用 `/api/admin/me`，401 跳转登录并记录 `redirect` 参数。
+注：v1.1.0 只注册前六个公开路由，其余路径重定向到 `/`。后台路由与守卫在 Section 3 接入：访问 `/admin/*`（登录页除外）时调用 `/api/admin/me`，401 跳转登录并记录 `redirect` 参数。
 
 ### 6.3 组件清单
 
-| 组件 | 职责 |
-|---|---|
-| `SiteHeader` | 主导航、后台入口、移动端折叠 |
-| `SiteFooter` | 备案号占位、非经营性声明、版本与署名 |
-| `ThemeSwitch` | 浅色/暗色切换，`localStorage` 持久化 |
-| `NoteCard` | 笔记列表项，标题、摘要、项目、日期 |
-| `ProjectCard` | 项目索引项，技术栈、关联笔记数、源码外链 |
-| `EmptyState` | 空列表提示 |
-| `ErrorBanner` | 接口错误与字段错误 |
-| `SkeletonList` | 列表加载骨架 |
-| `ConfirmDialog` | 删除确认，禁止误操作 |
-| `AdminLayout` | 后台侧栏、顶栏、退出登录 |
-| `NoteEditor` | 笔记表单、Markdown 预览、保存前校验 |
-| `ProjectEditor` | 项目表单、排序与状态 |
-| `PasswordForm` | 修改密码与二次确认 |
+| 组件 | 职责 | 状态 |
+|---|---|---|
+| `SiteHeader` | 主导航（后台入口待 Section 3 恢复） | 已实现 |
+| `SiteFooter` | 备案号占位、非经营性声明、版本与署名 | 已实现 |
+| `ThemeSwitch` | 浅色/暗色切换，`localStorage` 持久化 | 已实现 |
+| `NoteCard` | 笔记列表项，标题、摘要、项目、日期 | 已实现 |
+| `EmptyState` | 空列表提示 | 已实现 |
+| 骨架屏（`.skeleton-block` + `.skeleton-line`） | 列表与详情加载态 | 已实现 |
+| 错误横幅（`.error-banner`） | 接口错误提示与重试 | 已实现 |
+| `ProjectCard` | 项目索引项，技术栈、关联笔记数、源码外链 | 页面内联 |
+| `ConfirmDialog` | 删除确认，禁止误操作 | Section 3 |
+| `AdminLayout` | 后台侧栏、顶栏、退出登录 | Section 3 |
+| `NoteEditor` | 笔记表单、Markdown 预览、保存前校验 | Section 3 |
+| `ProjectEditor` | 项目表单、排序与状态 | Section 3 |
+| `PasswordForm` | 修改密码与二次确认 | Section 3 |
 
 ### 6.4 视觉与交互规范
 
@@ -500,7 +499,7 @@ Markdown 渲染管线：
 | 动效 | 仅 `transform` / `opacity`；150–300ms；尊重 `prefers-reduced-motion` |
 | 状态 | 每个列表必须提供加载、空、错误三态 |
 | 反馈 | 保存按钮提交中禁用并显示“保存中”；删除必须二次确认 |
-| 版本 | 页脚与后台侧栏显示 `v1.0.3 by Mr lin`，版本号在署名之前 |
+| 版本 | 页脚与后台侧栏显示 `v1.1.0 by Mr lin`，版本号在署名之前 |
 
 ### 6.5 后台交互
 
@@ -539,15 +538,15 @@ Markdown 渲染管线：
 
 ### 7.2 构建脚本
 
-`scripts/build.sh` 步骤：
+`scripts/build.sh` 步骤（v1.1.0 已实现前 4 步，镜像打包在 Section 5 补入）：
 
-1. 读取版本号：`VERSION=$(git describe --tags --always --dirty)`，无 Git 时读取 `app/VERSION`。
-2. `cd web && npm ci && npm run build`。
-3. `cd app && CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o ../build/dev-notes`。
-4. 可选：`docker build -t dev-notes:${VERSION} .`。
-5. 输出构建摘要：版本、二进制大小、前端产物大小。
+1. 读取版本号：`app/VERSION`。
+2. 版本一致性校验：`app/main.go` 的 `var version` 必须与 `app/VERSION` 相同，否则立即失败。
+3. `cd web && npm ci --registry=https://registry.npmmirror.com && npm run build`，产物输出 `app/internal/webui/dist`。
+4. `cd app && CGO_ENABLED=0 go build -tags embedui -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o build/dev-notes`。
+5. Section 5：`docker build -t dev-notes:${VERSION} .`。
 
-要求：脚本可重复执行；失败立即退出（`set -euo pipefail`）；不把版本号写死在脚本里。
+要求：脚本可重复执行；失败立即退出（`set -euo pipefail`）；不把版本号写死在脚本里。默认构建（无 `embedui`）不嵌入前端，`go test ./...` 无需先构建前端。
 
 ### 7.3 Dockerfile
 
@@ -586,7 +585,7 @@ ENTRYPOINT ["/app/dev-notes"]
 ```yaml
 services:
   dev-notes:
-    image: dev-notes:1.0.3
+    image: dev-notes:1.1.0
     container_name: dev-notes
     restart: unless-stopped
     ports:
@@ -673,6 +672,10 @@ services:
 | CSRF Token 缺失 | 403 |
 | 删除项目 | 笔记保留，`project_id` 置空 |
 | 分页与筛选 | 总数、页码、项目筛选正确 |
+| 项目列表 `note_count` | 与该项目已发布笔记数一致 |
+| 未知 `/api/*` | 404 JSON（`NOT_FOUND`） |
+| 非 `/api/` 未知路径（embedui 构建） | 回退 `index.html`，返回 200 |
+| `/assets/*` 静态文件 | 直接返回文件，`Cache-Control` 含 `immutable` |
 
 ### 8.4 浏览器测试清单
 
@@ -690,6 +693,21 @@ services:
 | 主题 | 浅色/暗色切换、刷新后保持 |
 | 响应式 | 1440px、1024px、390px 无横向溢出 |
 | 控制台 | 0 错误、0 警告 |
+
+v1.1.0 已执行（2026-11-17，Playwright + 本机 Chrome，临时库 3 项目 / 3 笔记）：
+
+| 场景 | 实际结果 |
+|---|---|
+| 首页 | 3 条笔记、2 个项目，页脚显示 `v1.1.0 by Mr lin` |
+| 笔记列表 | 初始 3 条（共 3 篇）；筛选 SiteGuard 后 1 条（共 1 篇） |
+| 搜索 | `CGo` 命中「用纯 Go 驱动摆脱 CGo 依赖」；无结果显示「没有匹配的笔记」 |
+| 笔记详情 | 标题、正文段落、关联项目 SiteGuard 正常 |
+| 不存在笔记 | 显示「笔记不存在或未公开」，过渡后不透明度为 1 |
+| 项目索引 | 3 张卡片，关联笔记数均为 1 篇 |
+| 项目详情 | 技术栈、关联笔记、源码仓库外链正常 |
+| 控制台 | 无 JS 异常（仅不存在笔记的接口 404，属预期） |
+
+尚未覆盖（后续 Section 补齐）：移动端 390px、暗色主题截图、后台登录与管理模块。
 
 ### 8.5 安全测试清单
 
@@ -724,7 +742,7 @@ services:
 | 阶段 | 任务 | 产出 | 验收 | 预估 |
 |---|---|---|---|---|
 | Section 1 | Go 骨架、配置、SQLite、迁移、模型、Store、健康检查 | 可启动二进制 | `go test ./...` 通过，`/healthz` 200 | 2 人日 |
-| Section 2 | 公开 API、Vue 前台 6 页、embed、主题 | 可浏览前台 | 浏览器 6 页通过，草稿不可见 | 2 人日 |
+| Section 2 | 公开 API、Vue 前台 6 页、embed、主题（已完成） | 可浏览前台 | 浏览器 6 页通过，草稿不可见 | 2 人日 |
 | Section 3 | 登录、会话、CSRF、管理 API、后台 4 模块、前置校验 | 可维护内容 | 登录/CRUD/校验/401 通过 | 3 人日 |
 | Section 4 | 真实内容录入、SEO 标题、合规文案、备案位 | 6 项目 + 5 笔记 | 内容与备案边界一致 | 1 人日 |
 | Section 5 | Docker、Compose、1Panel、端到端验收、文档 | 可部署镜像与发布包 | 重启数据不丢，浏览器验收通过 | 1 人日 |
@@ -759,6 +777,7 @@ services:
 
 | 版本 | 日期 | 变更 |
 |---|---|---|
+| v1.1.0 | 2026-11-17 | 完成 Section 2：正式前台接入真实 API、history 路由与 SPA 回退、静态资源 embed、构建脚本与浏览器验收 |
 | v1.0.3 | 2026-11-17 | 完成 Section 1：Go 骨架、SQLite 迁移、数据模型、Store、公开 API、健康检查与测试 |
 | v1.0.2 | 2026-11-17 | 确认第一版界面方案；新增详细技术方案 `doc/PROJECT.md`；同步版本与文档 |
 | v1.0.1 | 2026-11-17 | 新增 CODEBUDDY.md 工程约定文件；完成两版界面原型 |

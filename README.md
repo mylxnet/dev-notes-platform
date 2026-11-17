@@ -1,77 +1,202 @@
 # 我的开发笔记
 
-> 个人开发记录站点 · Vue 3 + TypeScript + Go + Gin + SQLite · v1.0.3 by Mr lin
+> **我的开发笔记** · Vue 3 + TypeScript + Go + Gin + SQLite
+> 个人非经营性开发记录站点：笔记为主、项目作索引，源码只外链 GitHub。
 
-记录个人学习软件开发过程中的技术笔记、问题排查与项目复盘。前台展示练习项目与笔记，后台供本人维护内容。站点用于甘肃个人 ICP 备案，内容严格限定为个人非经营性信息分享。
+[![Platform](https://img.shields.io/badge/Platform-Linux%20amd64-2f6b4f?logo=linux&logoColor=white)](https://www.kernel.org/)
+[![Backend](https://img.shields.io/badge/Backend-Go%201.27%20%2B%20Gin-00ADD8?logo=go&logoColor=white)](https://go.dev/)
+[![Frontend](https://img.shields.io/badge/Frontend-Vue%203%20%2B%20Vite%206-42b883?logo=vuedotjs&logoColor=white)](https://vuejs.org/)
+[![Database](https://img.shields.io/badge/Database-SQLite-003B57?logo=sqlite&logoColor=white)](https://www.sqlite.org/)
+[![Version](https://img.shields.io/badge/Version-1.1.0-d97757)](CHANGELOG.md)
+[![Deploy](https://img.shields.io/badge/Deploy-Docker%20%2B%201Panel-2496ED?logo=docker&logoColor=white)](doc/DEPLOY.md)
 
-## 核心特性
+[English](#english) | [中文](#中文)
 
-| 特性 | 说明 |
+## 中文
+
+### ✨ 这是什么
+
+- 一个**只写自己真做过的事**的个人开发笔记站，记录技术笔记、问题排查与项目复盘。
+- 首页以笔记为主体，项目只做索引，用来串起零散的尝试和最后的取舍。
+- 前台是纯展示：**无注册、无评论、无投稿**，只有本人通过 `/admin` 维护内容。
+- 站内**不托管任何安装包或可执行文件**，项目入口只链接到 GitHub 源码仓库。
+- 面向甘肃个人 ICP 备案，内容严格限定为「个人非经营性信息分享」。
+
+### 🎯 核心特性
+
+| 特性 | 描述 |
 |---|---|
-| 笔记驱动 | 首页以笔记为主体，项目以索引形式呈现 |
-| 单管理员后台 | 无注册、无评论，仅本人维护内容 |
-| 源码外链 | 站内不托管安装包，仅链接 GitHub 仓库 |
-| 备案友好 | 页脚预留备案号位置，经营性表述前置拦截 |
-| 单容器部署 | Go embed 静态资源，1Panel Compose 一键部署 |
+| 笔记驱动 | 首页展示最近笔记与前两个项目，不做产品目录式的观感 |
+| 真实接口渲染 | 五个前台页面全部请求 `/api/*`，无前端 mock 数据 |
+| 筛选与搜索 | 笔记列表支持按项目筛选、按标题/摘要关键词搜索（后端过滤 + 300ms 防抖） |
+| 三态可见 | 每个列表都有加载骨架、错误横幅（可重试）与空状态 |
+| 单二进制交付 | 前端产物通过 `-tags embedui` 嵌入 Go 二进制，运行时零外部依赖 |
+| history 路由 | 真实路径 `/notes/:slug`，Go 侧回退 `index.html`，不用 hash |
+| 草稿不外泄 | 公开接口在 Store 层强制过滤 `published`，草稿与隐藏内容进不了前台 |
+| 轻依赖 | 前端只有 `vue` 与 `vue-router`，无 UI 库、无状态库、无外部字体 |
 
-## 快速开始
+### 📸 界面
 
-当前进度：第一版界面已确认，Section 1（Go 后端骨架、SQLite、公开 API）已完成；正式前台与后台将在 Section 2–3 接入。
+| | |
+|---|---|
+| ![首页](doc/images/home.png)<br>首页 | ![笔记列表](doc/images/notes.png)<br>笔记列表 |
+| ![笔记详情](doc/images/note-detail.png)<br>笔记详情 | ![项目索引](doc/images/projects.png)<br>项目索引 |
 
-- 设计方案：`doc/DESIGN.md`
-- 技术方案：`doc/PROJECT.md`
-- 部署手册：`doc/DEPLOY.md`
-- 项目状态与待办：`doc/PROJECT_STATE.md`
+| | |
+|---|---|
+| ![项目详情](doc/images/project-detail.png)<br>项目详情 | 截图取自本地实例（示例内容），浅色主题，1440px 宽度 |
+
+### 🚀 快速开始
+
+**用户（部署即用）**
+
+当前版本为开发阶段产物，Docker 镜像与 1Panel 部署脚本在 Section 5 补齐，详见 [doc/DEPLOY.md](doc/DEPLOY.md)。拿到二进制后可直接运行：
 
 ```bash
-# 后端测试与启动（在 lxsyzd WSL 中执行）
 cd app
-go test ./... -count=1
-CGO_ENABLED=0 go build -trimpath -o build/dev-notes .
-
-SESSION_SECRET=0123456789abcdef0123456789abcdef \
+DATA_DIR=/opt/dev-notes/data \
+SESSION_SECRET=<32 位以上随机串> \
 ADMIN_INIT_USERNAME=admin \
-ADMIN_INIT_PASSWORD=admin12345678 \
-DATA_DIR=./data HTTP_ADDR=127.0.0.1:8080 ./build/dev-notes
+ADMIN_INIT_PASSWORD=<12 位以上> \
+HTTP_ADDR=127.0.0.1:8080 \
+./build/dev-notes
 ```
 
-访问 `http://127.0.0.1:8080/healthz` 应返回 `{"status":"ok","db":"ok","version":"1.0.3"}`。
+浏览器打开 `http://127.0.0.1:8080/` 即可访问前台。
 
-## 界面原型
+**开发者（从源码构建）**
 
-第一版原型已确认，源码与可直接打开的构建产物在 `prototype/`；第二版候选归档在 `prototype-v2/`，不参与正式构建。
+前置：Go 1.27、Node 22、npm。推荐在 WSL（Ubuntu 22.04）中构建。
 
 ```bash
-cd prototype
-npm install
-npm run dev
+# 完整构建：校验版本 → 装前端依赖 → 构建前端 → 静态编译
+bash scripts/build.sh
+# 产物：app/build/dev-notes（已内嵌前端）
+
+# 单元与接口测试
+cd app && go test ./... -count=1
+
+# 本地开发（两个终端）
+cd app && DATA_DIR=/tmp/dn-dev SESSION_SECRET=0123456789abcdef0123456789abcdef \
+  HTTP_ADDR=127.0.0.1:8080 go run .
+cd web && npm install && npm run dev   # Vite 把 /api 代理到 127.0.0.1:8080
 ```
 
-## 项目结构
+### 🛠️ 技术栈
 
-```
+| 层 | 选型 | 说明 |
+|---|---|---|
+| 后端 | Go 1.27 + Gin | 单二进制、`CGO_ENABLED=0` 静态编译 |
+| 数据库 | SQLite（`modernc.org/sqlite`） | 纯 Go 驱动，无 CGo；WAL + `busy_timeout` + 单连接 |
+| 前端 | Vue 3 + TypeScript + Vite 6 | 组合式 API，无 UI 库 |
+| 路由 | vue-router 4（history 模式） | Go `NoRoute` 回退 `index.html` |
+| 样式 | 原生 CSS 变量 | 浅色/暗色双主题，`localStorage` 持久化 |
+| 静态资源 | `go:embed` + `embedui` 构建标签 | 默认构建不嵌入，便于本地前后端分离调试 |
+| 构建 | `scripts/build.sh` | 版本一致性校验 + 前端构建 + 静态编译 |
+
+### 🔒 数据与隐私
+
+- 所有内容存在单个 SQLite 文件（默认 `/app/data/notes.db`），备份即复制文件。
+- 前台无统计脚本、无第三方 CDN、无外部字体、无 Cookie 追踪。
+- 后台为单管理员账号，密码用 bcrypt 哈希存储，明文不落库、不进日志。
+- 仅记录访问日志所需的最小信息（方法、路径、状态、耗时），不记录请求体与 Cookie。
+
+### 📁 项目结构
+
+```text
 dev-notes-platform/
-├── README.md             本文件
-├── CHANGELOG.md          逐版本变更记录
-├── CODEBUDDY.md          工程约定
-├── doc/
-│   ├── DESIGN.md         设计方案
-│   ├── PROJECT.md        详细技术方案
-│   ├── DEPLOY.md         部署手册
-│   └── PROJECT_STATE.md  项目状态与交接
-├── prototype/            已确认的第一版界面原型
-├── prototype-v2/         第二版候选（归档）
-├── deploy/               容器编排
-├── app/                  Go 后端（Section 1 已完成）
-├── web/                  Vue 前台与管理界面（待 Section 2–3）
-├── scripts/              构建脚本
-└── test/                 测试
+├── README.md              本文件（面向使用者）
+├── CHANGELOG.md           逐版本变更记录
+├── CODEBUDDY.md           工程约定
+├── doc/                   设计与交接文档（平铺）
+│   ├── DESIGN.md          设计方案
+│   ├── PROJECT.md         详细技术方案
+│   ├── PROJECT_STATE.md   项目状态、踩坑与待办
+│   ├── DEPLOY.md          部署手册
+│   └── images/            README 截图
+├── app/                   Go 后端
+│   ├── main.go            启动、优雅退出、日志
+│   ├── VERSION            版本号唯一来源
+│   └── internal/
+│       ├── api/           路由、公开接口、静态资源回退
+│       ├── auth/          密码哈希与会话（Section 3 接入）
+│       ├── config/        环境变量与启动校验
+│       ├── model/         领域模型
+│       ├── store/         SQLite 迁移与查询
+│       └── webui/         前端产物嵌入入口
+├── web/                   Vue 前台（正式实现）
+│   ├── src/api.ts         接口封装、类型与格式化
+│   ├── src/router.ts      history 路由
+│   ├── src/views/         五个前台页面
+│   ├── src/components/    通用组件
+│   └── vite.config.ts     产物输出到 app/internal/webui/dist
+├── prototype/             已确认的第一版界面原型（冻结基线）
+├── prototype-v2/          第二版候选（归档，不参与构建）
+├── deploy/                容器编排（Section 5）
+├── scripts/build.sh       构建脚本
+└── test/                  端到端测试脚本（Section 5）
 ```
 
-## 文件说明
+### 🖱️ 常用操作
 
-- 设计方案：`doc/DESIGN.md`
-- 详细技术方案：`doc/PROJECT.md`
-- 部署手册：`doc/DEPLOY.md`
-- 项目状态与待办：`doc/PROJECT_STATE.md`
-- 版本变更：`CHANGELOG.md`
+| 想做什么 | 怎么做 |
+|---|---|
+| 浏览全部笔记 | 顶部导航「笔记」，或首页「浏览全部笔记」 |
+| 按项目筛选笔记 | 笔记列表上方点击项目名 |
+| 搜索笔记 | 笔记列表右上角输入关键词，停止输入 300ms 后自动查询 |
+| 查看项目与关联笔记 | 顶部导航「项目」→ 点击卡片 |
+| 回到源码仓库 | 项目详情页「源码仓库 →」（新窗口打开 GitHub） |
+| 切换浅色/暗色 | 右下角主题按钮，刷新后保持 |
+| 构建可交付二进制 | `bash scripts/build.sh` |
+| 跑后端测试 | `cd app && go test ./... -count=1` |
+
+### 🐛 故障排查
+
+| 症状 | 原因 / 修复 |
+|---|---|
+| 页面空白、控制台报 404 | 前端产物未嵌入：用 `bash scripts/build.sh` 构建，或确认 `-tags embedui` |
+| 直接访问 `/notes/xxx` 404 | 反向代理未放行全路径；需把所有路径转给 Go，由 `NoRoute` 回退 |
+| 前端请求 `/api` 失败 | 开发时确认 Vite 代理与后端端口一致（默认 `127.0.0.1:8080`） |
+| 启动报「SESSION_SECRET 至少需要 32 个字符」 | 换成长度 ≥32 的随机串 |
+| 启动报「管理员账号必须同时设置」 | `ADMIN_INIT_USERNAME` 与 `ADMIN_INIT_PASSWORD` 成对设置 |
+| 后台入口点不到 | v1.1.0 暂未开放 `/admin` 入口，Section 3 接入认证后恢复 |
+| 笔记正文没有排版 | Markdown 渲染在 Section 3 接入，当前按空行分段显示纯文本 |
+| 项目卡片显示 0 篇关联笔记 | 该项目的笔记尚未发布；`note_count` 只统计 `published` |
+
+### 📜 更新日志
+
+当前版本 **v1.1.0**（Section 2：正式前台接入真实 API、history 路由、静态资源 embed、构建脚本）。
+
+逐版本明细详见 [CHANGELOG.md](CHANGELOG.md)。
+
+### 📄 许可证
+
+本项目为个人站点工程，暂未声明开源许可证。源码公开仅用于阅读参考，未授权再分发或商用。
+
+## English
+
+### What is this
+
+A personal, non-commercial developer-notes site: Markdown-style notes are the main content, projects act only as an index, and links point to GitHub source repositories instead of hosting any binaries. The public site is read-only — no registration, comments, or submissions; a single admin maintains content via `/admin` (coming in Section 3).
+
+### Tech Stack
+
+Go 1.27 + Gin + SQLite (`modernc.org/sqlite`, pure Go) on the backend, Vue 3 + TypeScript + Vite 6 on the frontend, plain CSS variables for theming, and the built frontend embedded into the binary with `go:embed` behind the `embedui` build tag.
+
+### Quick Start
+
+```bash
+bash scripts/build.sh            # builds web + static Go binary -> app/build/dev-notes
+cd app && DATA_DIR=/tmp/dn-data SESSION_SECRET=0123456789abcdef0123456789abcdef \
+  HTTP_ADDR=127.0.0.1:8080 ./build/dev-notes
+```
+
+Open `http://127.0.0.1:8080/`. For development run `cd app && go run .` and `cd web && npm run dev` (Vite proxies `/api` to port 8080).
+
+### Data & Privacy
+
+Content lives in a single SQLite file, so backups are a file copy. No analytics, no CDN, no external fonts, no tracking cookies. The admin password is stored as a bcrypt hash and never logged.
+
+### License
+
+No open-source license is declared yet. The source is public for reading only; redistribution and commercial use are not granted.
