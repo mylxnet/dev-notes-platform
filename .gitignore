@@ -1,0 +1,25 @@
+# 依赖目录
+node_modules/
+
+# 构建产物
+dist/
+build/
+app/web/dist/
+
+# 本地数据与配置
+data/
+*.db
+*.db-wal
+*.db-shm
+.env
+.env.*
+!.env.example
+
+# 工具与系统文件
+.codebuddy/
+.DS_Store
+Thumbs.db
+
+# 日志与临时文件
+*.log
+*.tmp
