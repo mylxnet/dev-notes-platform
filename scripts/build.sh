@@ -14,9 +14,26 @@ log() { printf '[build] %s\n' "$*"; }
 
 log "版本：$VERSION"
 
+# 防误用：正式构建不允许携带测试预填开关，凭据只能由 build-test.sh 显式注入。
+if [ "${VITE_TEST_LOGIN:-}" = "1" ] && [ "${DN_TEST_BUILD:-}" != "1" ]; then
+	printf '错误：正式构建不允许 VITE_TEST_LOGIN=1；测试包请用 scripts/build-test.sh\n' >&2
+	exit 1
+fi
+
 # 版本一致性：main.go 的默认值必须与 app/VERSION 相同，避免交付物版本错位。
 if ! grep -q "var version = \"$VERSION\"" "$APP_DIR/main.go"; then
 	printf '错误：app/main.go 的 version 与 app/VERSION（%s）不一致\n' "$VERSION" >&2
+	exit 1
+fi
+
+# 前端版本来源（界面版本行）与 package.json 也要同步，否则页面写的行为会和产物对不上。
+if ! grep -q "APP_VERSION = '$VERSION'" "$WEB_DIR/src/version.ts"; then
+	printf '错误：web/src/version.ts 的 APP_VERSION 与 app/VERSION（%s）不一致\n' "$VERSION" >&2
+	exit 1
+fi
+
+if ! grep -q "\"version\": \"$VERSION\"" "$WEB_DIR/package.json"; then
+	printf '错误：web/package.json 的 version 与 app/VERSION（%s）不一致\n' "$VERSION" >&2
 	exit 1
 fi
 

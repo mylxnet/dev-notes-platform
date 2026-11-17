@@ -114,13 +114,18 @@ button {
 .brand-mark {
   width: 32px;
   height: 32px;
+  flex: none;
   display: grid;
   place-items: center;
   border-radius: 10px;
   background: var(--accent);
-  color: #fffaf3;
-  font-size: 0.9rem;
-  font-weight: 800;
+  overflow: hidden;
+}
+
+.brand-mark svg {
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 
 .nav {
@@ -469,6 +474,48 @@ h2 {
   letter-spacing: -0.02em;
 }
 
+/* 卡片封面定高定比保证同一行卡片齐平；用 contain 避免裁掉示意图上的文字。 */
+.project-cover {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: contain;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  margin-bottom: 18px;
+  background: var(--surface-2);
+}
+
+/* 详情页封面按原始比例展示，不裁切封面上的文字。 */
+.project-hero {
+  /* 下方 .about-grid 自带 64px 上内边距，这里不再叠外边距。 */
+  margin: 0;
+}
+
+.project-hero img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface-2);
+}
+
+/* 说明里的标题要低于「项目说明」这一节标题，避免层级倒挂。 */
+.project-description > :first-child {
+  margin-top: 0;
+}
+
+.project-description h2 {
+  font-size: 1.15rem;
+  margin-top: 28px;
+}
+
+.project-description h3 {
+  font-size: 1rem;
+  margin-top: 22px;
+}
+
 .project-summary {
   color: var(--muted);
   font-size: 0.93rem;
@@ -547,6 +594,8 @@ h2 {
 .definition {
   display: grid;
   gap: 18px;
+  /* 右栏比正文短时，别让行被拉伸成一片留白。 */
+  align-content: start;
 }
 
 .definition-item {
@@ -563,6 +612,50 @@ h2 {
   margin: 0;
   color: var(--muted);
   font-size: 0.92rem;
+}
+
+/* 关于页单栏排版：宽度跟随 .container，与项目页保持同一条左右边界。 */
+.about-single {
+  padding: 16px 0 40px;
+}
+
+.about-prose h1 {
+  margin-bottom: 16px;
+}
+
+.about-prose h2 {
+  font-size: 1.12rem;
+  margin: 36px 0 10px;
+}
+
+.about-prose p {
+  color: var(--muted);
+  line-height: 1.95;
+  margin: 0 0 16px;
+  /* 与项目页同宽后单行变长，字号和行距各上调一档，避免满屏长句。 */
+  font-size: 1.02rem;
+}
+
+/* 导语沿用全局 .lead 的字号与颜色，但宽度跟随正文栏，避免标题、导语、段落三种右边缘。 */
+.about-prose .lead {
+  max-width: none;
+}
+
+.about-prose a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.about-prose a:hover {
+  text-decoration: underline;
+}
+
+.about-version {
+  margin-top: 40px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+  font-size: 0.86rem;
+  letter-spacing: 0.01em;
 }
 
 .site-footer {
@@ -709,18 +802,68 @@ h2 {
   text-underline-offset: 3px;
 }
 
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
 .empty {
   padding: 44px 20px;
   text-align: center;
   color: var(--muted);
   border: 1px dashed var(--border);
   border-radius: 16px;
+}
+
+.pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 36px;
+}
+
+.pager-btn {
+  min-width: 38px;
+  height: 38px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.88rem;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    color 0.18s ease,
+    background 0.18s ease;
+}
+
+.pager-btn:hover:not(:disabled):not(.active) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.pager-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fffaf3;
+}
+
+.pager-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.pager-gap {
+  color: var(--muted);
+  padding: 0 2px;
+}
+
+.pager-info {
+  margin-left: 6px;
+  color: var(--muted);
+  font-size: 0.82rem;
 }
 
 .error-banner {
@@ -987,10 +1130,46 @@ tbody tr:hover {
   min-height: 120px;
 }
 
+.field-block {
+  display: grid;
+  gap: 8px;
+}
+
+.field-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+/* 后台封面预览只占一行高，用于确认路径填对。 */
+.cover-preview {
+  height: 44px;
+  max-width: 240px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  object-fit: contain;
+  background: var(--surface-2);
+}
+
 .field-error {
   color: var(--red);
   font-size: 0.78rem;
   min-height: 1em;
+}
+
+/* 后台列表的分页条：靠左与表格对齐，间距比前台列表更紧。 */
+.admin-total {
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.admin-pager .pager {
+  justify-content: flex-start;
+  margin-top: 12px;
 }
 
 .message-card {
@@ -1113,8 +1292,24 @@ tbody tr:hover {
     font-size: 0.85rem;
   }
 
-  .header-actions .btn {
+  .pager {
+    gap: 8px;
+  }
+
+  .pager-btn {
+    min-width: 34px;
+    height: 34px;
+    padding: 0 9px;
+  }
+
+  /* 窄屏放不下 8 个按钮，只留上一页/下一页，页码信息由右侧文字承担。 */
+  .pager .pager-btn:not(.pager-nav),
+  .pager-gap {
     display: none;
+  }
+
+  .pager-info {
+    margin-left: 4px;
   }
 
   .note-row {

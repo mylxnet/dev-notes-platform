@@ -1,19 +1,23 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import NoteCard from '../components/NoteCard.vue'
 import EmptyState from '../components/EmptyState.vue'
+import Pager from '../components/Pager.vue'
 import { errorMessageOf, fetchNotes, fetchProjects, type Note, type Project } from '../api'
 
-/** 单页最多展示 50 篇，超出由后端分页兜底。 */
-const PAGE_SIZE = 50
+/** 每页固定 6 篇，翻页由后端分页承担。 */
+const PAGE_SIZE = 6
 
 const projects = ref<Project[]>([])
 const notes = ref<Note[]>([])
 const total = ref(0)
+const page = ref(1)
 const activeProject = ref<string | null>(null)
 const keyword = ref('')
 const loading = ref(true)
 const error = ref('')
+
+const totalPages = computed(() => Math.max(1, Math.ceil(total.value / PAGE_SIZE)))
 
 let activeController: AbortController | null = null
 let searchTimer: number | undefined
@@ -29,6 +33,7 @@ async function load() {
       {
         project: activeProject.value ?? undefined,
         keyword: keyword.value.trim() || undefined,
+        page: page.value,
         pageSize: PAGE_SIZE
       },
       controller.signal
@@ -36,6 +41,13 @@ async function load() {
     if (controller !== activeController) return
     notes.value = result.items
     total.value = result.total
+
+    // 筛选或搜索把总页数压小后，当前页可能越界，退到最后一页重新取。
+    const lastPage = Math.max(1, Math.ceil(result.total / PAGE_SIZE))
+    if (page.value > lastPage) {
+      page.value = lastPage
+      void load()
+    }
   } catch (err) {
     if (controller !== activeController) return
     if (err instanceof DOMException && err.name === 'AbortError') return
@@ -45,6 +57,14 @@ async function load() {
   } finally {
     if (controller === activeController) loading.value = false
   }
+}
+
+function goTo(target: number) {
+  const clamped = Math.min(Math.max(1, target), totalPages.value)
+  if (clamped === page.value) return
+  page.value = clamped
+  void load()
+  window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 async function loadProjects() {
@@ -60,12 +80,16 @@ async function loadProjects() {
 function selectProject(slug: string | null) {
   if (activeProject.value === slug) return
   activeProject.value = slug
+  page.value = 1
   load()
 }
 
 watch(keyword, () => {
   window.clearTimeout(searchTimer)
-  searchTimer = window.setTimeout(() => load(), 300)
+  searchTimer = window.setTimeout(() => {
+    page.value = 1
+    load()
+  }, 300)
 })
 
 onMounted(() => {
@@ -119,5 +143,15 @@ onUnmounted(() => {
       <NoteCard v-for="note in notes" :key="note.id" :note="note" />
     </div>
     <EmptyState v-else title="没有匹配的笔记" description="换个关键词，或选择「全部」项目筛选。" />
+
+    <Pager
+      v-if="!loading"
+      :page="page"
+      :total-pages="totalPages"
+      :total="total"
+      unit="篇"
+      label="笔记分页"
+      @change="goTo"
+    />
   </div>
 </template>

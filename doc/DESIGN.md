@@ -106,8 +106,9 @@ dev-notes-platform/
 
 ```
 project
-  id, name, slug, summary, tech_stack, repo_url, sort_order,
-  status(published|draft|hidden), created_at, updated_at
+  id, name, slug, summary, tech_stack, repo_url,
+  description(markdown 说明), cover_image(封面站内路径),
+  sort_order, status(published|draft|hidden), created_at, updated_at
 
 note
   id, title, slug, summary, content(markdown), project_id,
@@ -115,6 +116,9 @@ note
 
 admin
   id, username, password_hash, updated_at
+
+settings
+  key, value, updated_at          -- 站点配置，当前存 icp_number
 ```
 
 字段约束、索引与迁移策略见 `doc/PROJECT.md` 第五节。
@@ -127,6 +131,10 @@ admin
 | GET | `/api/notes/:slug` | 笔记详情 | 无 |
 | GET | `/api/projects` | 项目列表（仅已发布） | 无 |
 | GET | `/api/projects/:slug` | 项目详情 | 无 |
+| GET | `/api/site` | 站点公开信息（页脚备案号） | 无 |
+| GET/PUT | `/api/admin/settings` | 站点配置（备案号） | 是 |
+| POST | `/api/admin/media/upload` | 项目封面图上传 | 是 |
+| GET | `/media/uploads/:name` | 运行时上传图片下发 | 无 |
 | POST | `/api/admin/login` | 登录 | 无 |
 | POST | `/api/admin/logout` | 退出 | 是 |
 | GET/POST/PUT/DELETE | `/api/admin/projects` | 项目管理 | 是 |
@@ -143,6 +151,7 @@ admin
 - Markdown 渲染禁用原始 HTML，防止存储型 XSS
 - 前置校验在服务端执行，不依赖前端
 - 数据库文件放 `/app/data/`，容器重启不丢数据
+- 封面上传只收 PNG/JPG/WEBP（内容嗅探 + 2 MB 上限 + 随机文件名），禁 SVG；文件存 `DATA_DIR/media/`，与备份一并保留
 - 后台入口 `/admin`，不单独使用子域名，避免额外备案
 
 ## 九、部署方案
@@ -173,6 +182,11 @@ admin
 
 | 版本 | 日期 | 变更 |
 |---|---|---|
+| v1.4.4 | 2026-11-17 | 后台项目封面支持安全上传（png/jpg/webp、≤2 MB、随机名），存 DATA_DIR/media 并由独立路由下发 |
+| v1.4.3 | 2026-11-17 | 后台「站点设置」维护 ICP 备案号，页脚改为读取公开接口；新增 settings 键值表（schemaVersion 3） |
+| v1.4.2 | 2026-11-17 | 测试构建在登录框预填凭据以便本机验收，正式构建不含凭据并加开关防误用 |
+| v1.4.1 | 2026-11-17 | 后台笔记/项目列表按 6 条/页分页，分页条抽成 `Pager.vue` 供前后台三个列表复用 |
+| v1.4.0 | 2026-11-17 | 项目增加「详情说明（Markdown）」与「封面图（站内路径）」：老库按 v2 迁移自动补列；项目卡片显示封面，详情页渲染说明 HTML，后台表单可写可预览 |
 | v1.3.5 | 2026-11-17 | 新增 excelMailmerge 项目与 4 篇复盘；确立「同批文章不套同一骨架」的写作约定 |
 | v1.3.4 | 2026-11-17 | 录入 SiteGuard 的 4 篇技术复盘，其中 `reverse-proxy-origin-403` 启用 `/media/` 插图，配图通道端到端跑通 |
 | v1.3.3 | 2026-11-17 | 录入 LanFileShare 的 4 篇技术复盘；三个项目卡片的仓库地址与技术栈改为真实值 |

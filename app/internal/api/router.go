@@ -23,26 +23,29 @@ const maxAdminBody = 1 << 20
 
 // Server 持有 API 依赖。
 type Server struct {
-	store   *store.Store
-	auth    *auth.Manager
-	version string
+	store    *store.Store
+	auth     *auth.Manager
+	version  string
+	mediaDir string
 }
 
-// New 构建 Gin 路由。
-func New(st *store.Store, version string, sessions *auth.Manager) *gin.Engine {
+// New 构建 Gin 路由；mediaDir 是运行时上传图片的存放目录（通常为 DATA_DIR/media）。
+func New(st *store.Store, version string, sessions *auth.Manager, mediaDir string) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
 	router.Use(gin.Recovery(), requestID(), securityHeaders())
 
-	server := &Server{store: st, auth: sessions, version: version}
+	server := &Server{store: st, auth: sessions, version: version, mediaDir: mediaDir}
 
 	router.GET("/healthz", server.health)
+	router.GET("/media/uploads/:name", server.serveUploadedMedia)
 
 	api := router.Group("/api")
 	api.GET("/projects", server.listProjects)
 	api.GET("/projects/:slug", server.getProject)
 	api.GET("/notes", server.listNotes)
 	api.GET("/notes/:slug", server.getNote)
+	api.GET("/site", server.siteInfo)
 
 	// 登录不需要会话，也不校验 CSRF。
 	api.POST("/admin/login", bodyLimit(maxAdminBody), server.adminLogin)
@@ -70,6 +73,17 @@ func New(st *store.Store, version string, sessions *auth.Manager) *gin.Engine {
 	admin.POST("/projects", server.adminCreateProject)
 	admin.PUT("/projects/:id", server.adminUpdateProject)
 	admin.DELETE("/projects/:id", server.adminDeleteProject)
+
+	admin.GET("/settings", server.adminGetSettings)
+	admin.PUT("/settings", server.adminUpdateSettings)
+
+	// 上传单独放行更大的请求体（文件本身仍限制 2 MB），鉴权与 CSRF 与管理端一致。
+	upload := api.Group("/admin",
+		server.auth.RequireAdmin(loadAdmin),
+		server.csrfGuard(),
+		bodyLimit(3<<20),
+	)
+	upload.POST("/media/upload", server.adminUploadMedia)
 
 	router.NoRoute(noRouteHandler(webui.FS()))
 

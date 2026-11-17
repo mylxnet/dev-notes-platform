@@ -1,12 +1,208 @@
 # 项目状态 · 我的开发笔记
 
-> v1.3.9 · by Mr lin · 2026-11-17
+> v1.4.4 · by Mr lin · 2026-11-17
 
 ## 当前版本
 
-v1.3.9 · Section 3 已完成，Section 4 进行中：8 个项目共 31 篇，全部为真实技术复盘（早期 3 篇占位笔记已不再重建）。下一阶段：Section 5 部署。
+v1.4.4 · Section 3 已完成，Section 4 进行中：8 个项目共 31 篇，全部为真实技术复盘（早期 3 篇占位笔记已不再重建）。数据库结构版本 `schemaVersion = 3`（新增 `settings` 表）。下一阶段：Section 5 部署。
 
-## 本轮改动记录（v1.3.9，2026-11-17）
+**当前 `app/build/dev-notes` 是测试包**：登录页预填测试账号密码，仅用于本机验收；对外发布必须重新执行 `bash scripts/build.sh`。服务当前挂载真实库 `/tmp/dn-dev/notes.db`，上传图片落在 `/tmp/dn-dev/media/`。
+
+## 本轮改动记录（v1.4.4，2026-11-17）
+
+- 后台项目编辑页封面框新增「选择图片上传」按钮：前端先校验扩展名（png/jpg/jpeg/webp）与大小（≤2 MB），上传成功自动填入 `/media/uploads/…`，封面缩略图即时刷新。
+- 新增 `api/internal/api/media.go`：`POST /api/admin/media/upload`（鉴权 + CSRF）做扩展名白名单、`http.DetectContentType` 内容嗅探、2 MB 上限、crypto/rand 随机文件名，写 `.part` 后原子改名到 `DATA_DIR/media`；`GET /media/uploads/:name` 严格名校验后下发，长缓存。
+- `api.New` 增加 `mediaDir` 参数（`cfg.DataDir + "/media"`）；上传路由单独 `bodyLimit(3<<20)`，管理端其他接口仍为 1 MB。
+- `requestJSON` 识别 `FormData` 并交给浏览器设置 multipart 边界；`admin.ts` 新增 `uploadMedia`。
+- 版本升至 `v1.4.4`（5 处版本字段 + 文档）。
+
+### 验收证据（v1.4.4，2026-11-17）
+
+- `gofmt -l .` 无输出；`go vet ./...` 无输出；`go test ./... -count=1` 全部 ok。
+- 新增 `TestMediaUpload`：未登录 401、缺 CSRF 403、SVG 扩展名 422、改名伪装的文本 422、超 2 MB 422；合法 1×1 PNG 返回 `/media/uploads/<32位hex>.png`、文件落盘、直接 GET 200 且 `Content-Type: image/png`、非法文件名 404。
+- 浏览器（Playwright，独立临时库 + 测试包）：选伪造 PNG → 服务端嗅探拒绝且封面路径保持空；选真实 PNG → 路径自动填入且格式匹配、缩略图 1 张；保存项目后前台详情页与卡片封面 `naturalWidth=1`（测试图为 1×1）、直接访问图片 200 `image/png`。控制台仅出现那次**故意触发**的 422，无其他错误。
+- 真实库未改动：服务切回 `/tmp/dn-dev` 后 `/healthz` 返回 `1.4.4`，项目数仍为 8。
+
+## 历史改动记录（v1.4.3，2026-11-17）
+
+- 新增 `settings(key TEXT PRIMARY KEY, value TEXT, updated_at TEXT)` 键值表，`schemaVersion = 3`；`Store.GetSetting/SetSetting` 处理未配置返回空串与同键覆盖（UPSERT）。
+- 接口：`GET /api/site`（公开，页脚用）、`GET/PUT /api/admin/settings`（鉴权 + CSRF）；`validate.ICPNumber` 校验备案号，空串合法用于恢复占位。
+- 前端：新增 `AdminSettingsView.vue` 与 `/admin/settings` 路由、后台侧栏入口；`SiteFooter.vue` 改为从共享状态 `web/src/site.ts` 读备案号，`App.vue` 挂载时拉一次，后台保存后 `loadSiteInfo(true)` 立即刷新。
+- 备案号规则：留空或 5–100 位汉字/字母/数字/连字符；非法值前后端都拦截，提示里给出示例。
+- 版本升至 `v1.4.3`（5 处版本字段 + 文档）。
+
+### 验收证据（v1.4.3，2026-11-17）
+
+- `gofmt -l .` 无输出；`go vet ./...` 无输出；`go test ./... -count=1` 全部 ok。
+- 新增用例：`TestSettingsStore`（未配置空串、覆盖更新、清空）、`TestSiteSettings`（公开初值为空、未登录 401、缺 CSRF 403、`<script>` 值 422 且指明字段、保存后公开接口可读、清空后恢复空串）；`TestMigrateV1Database` 补断言：v1 老库升到 v3 后 `settings` 表可读。
+- 浏览器验收（Playwright，临时空库 + 测试包）：初始页脚为「甘ICP备xxxxxxxx号（备案通过后显示）」；设置页初始值为空、版本行 `v1.4.3 by Mr lin`；填 `<script>x</script>` 被前端拦截并提示示例；保存 `甘ICP备12345678号-1` 后首页页脚显示该备案号；清空后项目页页脚恢复占位；390px 页脚无横向溢出；控制台错误 0 条。
+- 真实库升级核验（`/tmp/dn-dev/notes.db`，升级前备份为 `notes.db.bak-before-v3`）：`user_version=3`、`settings` 表存在且 0 行、项目 8 / 笔记 31 未变、`/api/site` 返回空备案号、前台接口 30 篇已发布 + 8 个项目；`/healthz` 返回 `1.4.3`。
+
+## 历史改动记录（v1.4.2，2026-11-17）
+
+- 后台登录页 `AdminLoginView.vue` 仅在 `import.meta.env.VITE_TEST_LOGIN === '1'` 时，用 `VITE_TEST_USERNAME` / `VITE_TEST_PASSWORD` 预填两个输入框；正式构建无凭据，输入框留空。
+- 新增 `scripts/build-test.sh`：注入 `DN_TEST_BUILD=1`、`VITE_TEST_LOGIN=1` 与测试凭据（默认测试账号密码，可由同名环境变量覆盖），再调用 `scripts/build.sh`；输出目录参数透传。
+- `scripts/build.sh` 增加防误用：未标记 `DN_TEST_BUILD=1` 却带 `VITE_TEST_LOGIN=1` 时直接退出。
+- 新增 `web/src/vite-env.d.ts` 声明三个构建变量类型；版本升至 `v1.4.2`（5 处版本字段 + 文档）。
+
+### 验收证据（v1.4.2，2026-11-17）
+
+- 防误用：直接 `VITE_TEST_LOGIN=1 bash scripts/build.sh /tmp/dn-guard-check` → 输出「错误：正式构建不允许 VITE_TEST_LOGIN=1；测试包请用 scripts/build-test.sh」，`guard-exit=1`。
+- 隔离性：`bash scripts/build.sh /tmp/dn-release-check` 后正式二进制中明文密码 `grep` 计数 **0**；`bash scripts/build-test.sh` 后 `app/build/dev-notes` 中计数 **1**。
+- 构建：`/healthz` 返回 `{"db":"ok","status":"ok","version":"1.4.2"}`；`gofmt -l .` 无输出；`go vet ./...` 无输出；`go test ./... -count=1` 全部 ok。
+- 浏览器（Playwright）：`/admin/login` 预填账号 `admin`、密码长度 13；不输入任何内容直接点「登录管理后台」→ 落到 `/admin/notes`；后台侧栏版本行 `v1.4.2 by Mr lin`；控制台错误 0 条。
+
+## 历史改动记录（v1.4.1，2026-11-17）
+
+- 后台「笔记管理」由一次性拉 50 条改为每页 6 条 + 分页条，翻页参数走后端 `/api/admin/notes?page=&page_size=`（接口早已支持，前端没接）。
+- 后台「项目管理」同样每页 6 条：`store.ListAllProjects` 改为接收 `AdminProjectFilter{Limit, Offset}` 并新增 `CountAllProjects`；`GET /api/admin/projects` 增 `page` / `page_size`（默认 20、上限 100），用 `respondList` 返回 `total` / `page` / `page_size`。
+- 抽出 `web/src/components/Pager.vue`（页码折叠规则 + 按钮结构 + 页码文案），前台笔记列表、后台笔记/项目三处共用；`NotesView.vue` 里原来的内联分页模板与 `pageNumbers` 计算删除。
+- 交互对齐前台：翻页回顶、切筛选/改搜索词回第 1 页、总页数变少时退到最后一页（含删掉最后一页唯一一条的场景）。
+- 后台只有一页时不渲染翻页按钮，用一行「共 N 篇 / 个」补总数；多页时该行隐藏，总数由分页条承担。
+- 新增样式 `.admin-total`、`.admin-pager .pager`（靠左、间距比前台紧）。
+- 版本升至 `v1.4.1`（5 处版本字段 + 文档）。
+
+### 验收证据（v1.4.1，2026-11-17）
+
+- `gofmt -l .` 无输出；`go vet ./...` 无输出；`go test ./... -count=1` 全部 ok。
+- 新增用例：`TestAdminProjectPaging`（7 个项目按 `sort_order` 分页：第 1 页 6 条为 1..6、第 2 页 1 条为 7、越界页返回空列表、`CountAllProjects=7`）；`TestAdminProjectListPaging`（接口层：`page=1&page_size=6` 返回 6 条且 `total=7`、`page=2` 返回 1 条、不传参数时按默认 `page_size=20` 返回 7 条）。
+- 接口自查（临时库 8 个项目、15 篇笔记）：`projects page2: 2 total 8 page 2 size 6`；`notes page2: 6 total 15 page 2 size 6`。
+- 浏览器验收（Playwright + WSL Chromium，1280px / 390px）：
+  - 后台笔记：第 1 页 6 行、`第 1 / 3 页 · 共 15 篇`、页码按钮 `上一页 1 2 3 下一页`；翻下一页 6 行且 `scrollY=0`；点第 3 页 3 行、高亮为 3；切「已发布」回到 `第 1 / 2 页 · 共 7 篇`；搜索命中 1 条时分页条消失、改为一行「共 1 篇」；多页时独立总条数行为 0（不重复）。
+  - 后台项目：第 1 页 6 行、`第 1 / 2 页 · 共 8 个`；第 2 页 2 行、首行为 `paging-demo-7`。
+  - 390px 后台笔记：可见按钮仅 `上一页 / 下一页`，横向溢出 0。
+  - 前台 `/notes` 回归：第 1 页 6 张卡片、`第 1 / 2 页 · 共 7 篇`；翻第 2 页 1 张、`scrollY=0`。
+  - 控制台错误 0 条。
+- 构建：`bash scripts/build.sh` 通过，`/healthz` 返回 `{"db":"ok","status":"ok","version":"1.4.1"}`。
+
+## 历史改动记录（v1.4.0，2026-11-17）
+
+- 项目表新增 `description`（Markdown 说明，≤ 20 KB）与 `cover_image`（封面图站内路径）两列，`schemaVersion` 升到 2。
+- 迁移用 `PRAGMA table_info(project)` 探测列存在性，缺列才 `ALTER TABLE ... ADD COLUMN`；新建库跑 v1 建表后再走 v2，与老库同一路径。
+- Store 四个触点同步改：`projectColumns` 增两列、`scanProject` 的 `Scan` 实参按同序补齐、`CreateProject` 的 INSERT 扩到 11 个占位符、`UpdateProject` 增两列赋值。
+- 接口层：`projectInput` 增 `Description`/`CoverImage`（去首尾空格后入库）；前台详情把 `description` 渲染成 `description_html` 并把原文置空；前台列表把 `description` 置空但保留 `cover_image`。
+- 校验层：说明 ≤ 20 KB 且纳入备案词扫描（顺序追加 `description`）；封面路径必须匹配 `^/(assets|media)/…\.(png|jpe?g|webp|svg|gif)$` 且不含 `..`、`//`。
+- 前端：项目卡片显示封面（16:9 容器 + `object-fit: contain`，不裁字）；详情页封面按原比例展示、说明用 `.project-description` 渲染（内嵌 `h2/h3` 字号下调）；后台项目编辑页加封面输入（带缩略图）、说明编辑区（字节计数）与「预览说明」。
+- 版本升至 `v1.4.0`：`app/VERSION`、`app/main.go`、`web/package.json`、`web/package-lock.json`、`web/src/version.ts`、全部文档同步。
+
+### 验收证据（v1.4.0，2026-11-17）
+
+- `gofmt -l .` 无输出；`go vet ./...` 无输出；`go test ./... -count=1`：`api`、`auth`、`config`、`render`、`store`、`validate` 全部 ok。
+- 新增用例：`TestAdminProjectCRUD` 扩展说明/封面的创建与更新读回；`TestProjectDetailIncludesPublishedNotes` 校验 `description_html` 含 `<h2>定位</h2>` 且 `description` 为空；`TestProjectListOmitsDescriptionSource`；`TestProjectCoverImageRules`（7 组路径正反例，含 `..` 穿越）；`TestProjectDescriptionRules`（超限、命中禁用词、正常文本）；`TestMigrateV1Database`（v1 建表 + `user_version=1` → `Open` 自动补列、老数据保留、新列可写可读、重复打开不报错）。
+- `bash scripts/build.sh`：版本一致性校验通过（1.4.0），前端 68 模块构建成功，`app/build/dev-notes` 产出。
+- 接口冒烟（临时库 `DATA_DIR=/tmp/dn-e2e`，`:18091`）：
+  - `POST /api/admin/projects` 带说明与封面 → 201，返回 `id=1 cover=/media/siteguard-origin.svg desc_bytes=133`；
+  - `/api/projects` 列表 → `slug=cover-desc-demo cover='/media/siteguard-origin.svg' description=''`；
+  - `/api/projects/cover-desc-demo` → `description=''`、`description_html` 含 `<h2>这是什么</h2>` / `<strong>说明渲染</strong>` / `<ul>`；
+  - 非法封面 `https://evil.example/a.png` → 422 `VALIDATION_FAILED field=cover_image`；
+  - 说明含「支付」→ 422 `CONTENT_BLOCKED field=description hits=["支付"]`。
+- 浏览器验收（Playwright + WSL 内 Chromium，1280px / 390px，`http://localhost:18091`）：
+  - `/projects`：1 张卡片，封面元素 531×298.7（16:9），原图 860×330 未被裁切；390px 下封面 308×173.2，横向溢出 0；
+  - `/projects/cover-desc-demo`：详情封面 1180×454（比例 2.599，原图 2.606，未变形）；说明 `h2=['这是什么']`、`li` 2 条、`strong=['说明渲染']`，回退静态文案节点数为 0；
+  - `/admin/projects/1/edit`：说明字段与封面路径回填正确、缩略图 1 个、字节计数「133 / 20480 字节」、预览 `h2/li` 正常；填外链封面后本地即拦截并提示「封面图需填站内路径，如 /media/projects/example.png」；
+  - 控制台错误 0 条。
+- 复验：改 `object-fit: contain` 与说明标题字号后重新打包、重启（同库），上述指标复测一致。
+
+## 历史改动记录（v1.3.19，2026-11-17）
+
+- 首页「项目索引」区块副标题由「个人练习作品，仅作记录与源码外链」改为「个人练习作品，共 N 个」，与 `/projects` 一致。
+- 首页只渲染前 2 个项目，数字改用 `fetchProjects()` 的 `total`（新增 `projectTotal`），不能取 `indexProjects.length`。
+- 版本升至 `v1.3.19`。
+
+### 验收证据（v1.3.19，2026-11-17）
+
+- 1280px 首页：项目索引区块副标题为「个人练习作品，共 8 个」，下方仍只渲染 2 张卡片，两张卡片状态均为「已完成」（与 `/projects` 一致）。
+- 全站搜索「仅作记录与源码外链」→ 0 处残留；项目卡片不再出现「已发布」。
+- 构建通过，`/healthz` 返回 `{"db":"ok","status":"ok","version":"1.3.19"}`。
+
+## 历史改动记录（v1.3.18，2026-11-17）
+
+- 项目状态文案改为「已完成」：`api.ts` 新增 `projectStatusText`，项目索引卡片与项目详情页统一引用；笔记侧仍用原 `statusText`。
+- 项目卡片状态标签改为按 `project.status` 动态取类名与文案，不再写死 `status-published` / 「已发布」。
+- 删除项目索引页顶部提示条「本站不托管安装包或可执行文件。受许可证约束…」；`.callout` 样式保留（后台仍在用）。
+- 验收：`/projects` 8 张卡片全为「已完成」，`.callout` 节点数 0；`/projects/siteguard` 同步；首页笔记仍「已发布」。
+
+## 历史改动记录（v1.3.17，2026-11-17）
+
+- 项目索引页副标题改为「个人练习作品，共 N 个」（N 取 `projects.length`），删除右侧重复的「已公开 N 个」。
+- 验收：`.section-subtitle` = 「个人练习作品，共 8 个」，卡片数 8，右侧无重复计数。
+
+## 历史改动记录（v1.3.16，2026-11-17）
+
+- 首页导语（`HomeView.vue` 的 `.lead`）删除「内容仅作个人非经营性分享，项目只提供源码入口，不提供任何下载。」，只保留「这里记录我在学习软件开发过程中的技术笔记、问题排查与项目复盘。」。
+- 验收：1280px 首页 `.hero .lead` 与全页文本均不含「下载」「非经营性」。
+
+## 历史改动记录（v1.3.15，2026-11-17）
+
+- 前台页头去掉「后台管理」，访客侧不再暴露后台入口；后台改为直接访问 `/admin`。`README.md` 的「进入后台」同步改写。
+- 笔记列表改为每页 6 篇 + 页码分页（上一页 / 页码 / 下一页 + 「第 X / Y 页 · 共 N 篇」）；`PAGE_SIZE` 由 50 改为 6。
+- 翻页滚回顶部；切项目筛选、改搜索词自动回第 1 页；筛选后总页数变少时自动退到最后一页。
+- 窄屏（≤600px）隐藏页码按钮，只留上一页 / 下一页与页码文字。
+- 删除无用的 `.header-actions` 样式与窄屏隐藏规则。
+
+### 验收证据（v1.3.15，2026-11-17）
+
+- 1280px：`/notes` 首屏 6 篇；页码条按钮为 `上一页 1 2 3 4 5 6 下一页`，信息「第 1 / 6 页 · 共 31 篇」。
+- 点第 3 页后：信息变「第 3 / 6 页 · 共 31 篇」，高亮按钮为 `3`，列表换成第 13~18 篇，`window.scrollY == 0`（已回顶部）。
+- 页头链接实测为 `我的开发笔记 / 首页 / 笔记 / 项目 / 关于`，已无「后台管理」。
+- 390px：页码按钮隐藏，仅 `上一页 / 下一页` + 页码文字，`scrollWidth == 390`。
+- 构建通过，`/healthz` 返回 `{"db":"ok","status":"ok","version":"1.3.15"}`。
+
+## 历史改动记录（v1.3.14，2026-11-17）
+
+- 关于页宽度去掉单独限宽（原居中 780px），改为跟随 `.container`，与项目页同宽。
+- 段落字号提到 `1.02rem`、行高 1.95、段间距 16px，缓解 1180px 宽栏的长行阅读压力。
+- 验收：1440px 视口下 `.project-grid` 与 `.about-single` 实测均为 `left=130 / right=1310 / 宽=1180`。
+
+## 历史改动记录（v1.3.13，2026-11-17）
+
+- 关于页单栏由「左对齐 720px」改为「居中 780px」（`margin-inline: auto`），修掉宽屏右侧大块空白。
+- 去掉 `.about-prose p` 的 `66ch` 与 `.about-prose .lead` 的 `62ch`，标题 / 导语 / 段落统一到同一条右边缘。
+- 验收：1440px 下宽 780、左右各 330，`h1` 与 `p.lead` 均为 780；390px 下容器 358、左右各 16，无横向滚动。
+
+## 历史改动记录（v1.3.12，2026-11-17）
+
+- 关于页删除右侧信息栏（内容范围 / 项目 / 更新节奏 / 后台入口 / 站点性质 / 备案信息），只留三节正文 + 末尾版本行。
+- 版式改单栏：`AboutView.vue` 去掉 `.about-grid` 包裹，改 `.about-single`（`max-width: 720px`）；`.about-grid` / `.definition` 样式保留，`ProjectDetailView` 仍在用。
+- 版本升到 `v1.3.12`，`web/src/version.ts` 同步（关于页、后台侧栏、登录页的版本行都从这里取）。
+
+### 验收证据（v1.3.12，2026-11-17）
+
+- 构建通过，`/healthz` 返回 `{"db":"ok","status":"ok","version":"1.3.12"}`。
+- 关于页 DOM：`.about-grid` 与 `.definition` 均不存在；`.about-single` 计算宽度上限 `720px`；`.about-version` 文本 `v1.3.12 by Mr lin`。
+- 1280px：`scrollWidth == 1280`，单栏正文左侧与页头 logo 对齐，无横向滚动。
+
+## 历史改动记录（v1.3.11，2026-11-17）
+
+- 页脚（`SiteFooter.vue`）去掉「个人非经营性技术记录 · 源码仅外链 GitHub」，只留备案号一行；版本与署名按要求移到关于页。
+- 关于页（`AboutView.vue`）重写：结构参照常见个人技术博客的关于页，正文三节「我是谁？」「为什么建这个站？」「在哪里可以找到我？」，右侧信息栏六项（内容范围 / 项目 / 更新节奏 / 后台入口 / 站点性质 / 备案信息），正文末尾一行 `v1.3.11 by Mr lin`。
+- 新增 `web/src/version.ts` 作为前端唯一版本来源（`APP_VERSION` / `APP_AUTHOR` / `VERSION_LINE`），关于页、后台侧栏、登录页统一引用，后续升版本只改这一处 + 三处构建字段。
+- 修 `.definition` 的 `align-content`：正文变长后右栏网格行被拉伸，条目间出现过百像素空白。
+
+### 验收证据（v1.3.11，2026-11-17）
+
+- 构建：`vite build` + Go embed 通过，`/healthz` 返回 `{"db":"ok","status":"ok","version":"1.3.11"}`。
+- 桌面 1280px：关于页 `h1=关于`，`h2` 三节齐全，正文 9 段，`.about-version` 文本 `v1.3.11 by Mr lin`，`scrollWidth == clientWidth == 1280`。
+- 页脚：`innerText` 仅 `甘ICP备xxxxxxxx号（备案通过后显示）`，版本行已从全站页脚消失。
+- 窄屏 390px：`scrollWidth == 390`，无横向滚动条，正文与信息栏正常堆叠。
+- 右侧信息栏：修正后条目间距回到 18px，不再被拉伸。
+
+## 历史改动记录（v1.3.10，2026-11-17）
+
+- 品牌标识改版：`<span class="brand-mark">N</span>` → 组件 `BrandLogo.vue`（内联 SVG，32×32 设计稿）。
+- 图形为「折角笔记纸 + 字母 N」：纸面暖白、右上折角压深、N 用 accent 描边；外框仍是 `--accent` 圆角方块，暗色主题跟随 `#e08a6c`。
+- 方案取舍：同时比过「折角纸 + 两道笔记线」（A）与「加粗版」（B），两者在 32px 上像通用文档图标、24px 以下线条糊成一块；最终选 C「纸上的 N」，字母在 16px 仍可辨，且延续原来「N」的记忆点。
+- `favicon.svg` 同步为同一几何的 64×64 版本。
+- `.brand-mark` 从「文字容器」改为「SVG 容器」：去掉字号/字重/文字色，加 `flex: none`、`overflow: hidden`，SVG 100% 填充；尺寸 32×32、圆角 10px 不变，头部与侧栏布局零位移。
+
+### 验收证据（v1.3.10，2026-11-17）
+
+- 首页 DOM：`.brand-mark` 内含 `<svg>`，`getBoundingClientRect` 为 `32 × 32`，`path` 节点 3 个，底色 `var(--accent)`、纸面 `#fffaf3`。
+- 暗色主题：`document.documentElement.dataset.theme='dark'` 后 `.brand-mark` 计算背景为 `rgb(224, 138, 108)`（即 `--accent` 暗色值），纸面与 N 对比正常。
+- 浏览器截图（Edge 1280px，明暗两套）确认头部 logo 与「我的开发笔记」文字基线对齐，导航未位移。
+- 后台侧栏 `AdminLayout.vue` 同一组件、同一尺寸，随侧栏 32px 占位渲染。
+
+## 历史改动记录（v1.3.9，2026-11-17）
 
 - 新增项目 `exceltohub`（台账汇总器 / LedgerHub，id=8）：`C# / .NET 8 / WPF / ClosedXML`，源码外链 `https://github.com/mylxnet/ExcelToHub`；该仓库未声明许可证，站点只放外链，不做分发说明。
 - 新增 3 篇，素材取自 `README.md` 与 `doc/PROJECT_STATE.md`（踩坑 1~5、v1.1.6 脱敏记录、38 项冒烟 / 13 项 UI 回归）：
@@ -263,6 +459,14 @@ v1.3.9 · Section 3 已完成，Section 4 进行中：8 个项目共 31 篇，�
 | D18 | 会话不落库，用签名 Cookie 携带 `admin.updated_at` | 单管理员无需会话表，改密即让旧会话失效 |
 | D19 | 登录限流用进程内计数 | 单实例部署足够；重启后计数清零可接受 |
 | D20 | `COOKIE_SECURE` 默认 `auto`，按请求协议判断 | 兼顾两类部署：HTTP 直连能登录，反代终结 TLS 时仍保留 Secure；代价是判断依赖 `X-Forwarded-Proto`，代理未透传时按 HTTP 处理（宁可可用，不牺牲登录） |
+| D21 | 加字段走 `user_version` + 探列式 `ALTER TABLE`，不重建表 | 存量库有真实内容，重建要搬数据且易丢；探列让迁移可重跑（中断后再次启动不会因「列已存在」失败）。代价是迁移代码里保留 v1 历史建表语句，读代码要按版本顺序看 |
+| D22 | 项目说明存 Markdown 原文、前台只给 `description_html` | 与笔记正文同一口径：前端不接触原始输入，渲染与净化只在服务端一次；列表接口置空说明原文，避免长文随列表重复下发 |
+| D23 | 封面图只收站内路径、不做上传接口 | 站点规模小、配图走仓库 `web/public/media/`，无上传即无文件写入与鉴权面；代价是运营时要手工放文件再填路径，故后台加缩略图预览兜底填错路径 |
+| D24 | 三处列表统一 6 条/页，分页条抽成 `Pager.vue` | 后台与前台同一套翻页手感，用户不用在两处适应不同节奏；页码折叠规则只维护一份，避免前后台分页行为漂移。代价是后台表格一屏放得下 10 行，6 条会多翻一页，属可接受 |
+| D25 | 后台项目列表也在服务端分页，而非前端切片 | 与笔记列表同一套 `LIMIT/OFFSET + COUNT` 写法，`total` 由 SQL 统计，删除后页码回退逻辑通用；代价是项目量少时多一次 COUNT 查询，可忽略 |
+| D26 | 测试凭据走构建变量 + 独立测试构建脚本，不硬编码进组件 | 登录页是公开页面，硬编码凭据会随正式产物泄露；用 `VITE_TEST_LOGIN=1` 开关把测试便利限制在验收包内，`build.sh` 再加防误用校验。代价是测试包与正式包是两份产物，必须明确区分用途 |
+| D27 | 站点配置用 `settings` 键值表，不往 `admin` 表加列 | 备案号是站点属性而非管理员属性；键值表后续加配置项无需迁移表结构。代价是 `schemaVersion` 升到 3，前台多一次极轻量的公开查询（整站只拉一次） |
+| D28 | 封面图支持上传，但只收 png/jpg/webp、禁 SVG，文件存 `DATA_DIR/media` | 解决「换图要重打包」痛点，同时把文件写入面压到最小：扩展名 + 内容嗅探双校验、随机名防穿越、2 MB 上限；SVG 可内嵌脚本故不支持。代价是备份要带上 media 目录 |
 
 ## 已知限制
 
@@ -302,6 +506,15 @@ v1.3.9 · Section 3 已完成，Section 4 进行中：8 个项目共 31 篇，�
 | 主仓库 `app/`、`doc/`、`tools/`、`scripts/` 突然"消失"，但 `git status` 不报删除 | 误在本仓库执行了 `git sparse-checkout set --no-cone '/*.md'`（本想对 `.tmp_lfs` 克隆执行，`cd` 失败后落到了父仓库），149 个文件被标 `skip-worktree`，工作区只剩根目录 md | `git sparse-checkout disable` 恢复；核验 `Test-Path` 与 `git ls-tree -r HEAD` 文件数（152）一致 | 在仓库内做临时克隆/实验前先确认当前目录；`skip-worktree` 会让缺文件看起来"没改过"，排查时先查 `git ls-files -v` 的 S 标记 |
 | 用内网 IP 以 http 访问后台，登录后立刻被踢回登录页、无法新增或修改 | `COOKIE_SECURE` 默认 `true`，Cookie 带 `Secure`，HTTP 下被浏览器丢弃 → `/api/admin/me` 401 | `COOKIE_SECURE` 改为三档，默认 `auto` 按请求协议判断（含 `X-Forwarded-Proto`） | Secure Cookie 只在 HTTPS 与 localhost 生效，本机测试通过不代表换地址可用；会话类问题先看 Cookie 是否落盘 |
 | `TestParseRejectsTamperedSession` 时好时坏 | 用例改写 base64url 末位字符，末位含未使用位，解码后字节可能完全相同，篡改等于没改 | 改为改写签名段首字符，保证解码字节必变 | 校验签名的用例不能靠「改一个字符」想当然，要确认改动真的改变了字节 |
+| 给 `project` 加列后若只改建表语句，老库查询报 `no such column: description` | `CREATE TABLE IF NOT EXISTS` 对已存在的表不生效，老库结构不会跟着变 | 加 v2 迁移：`PRAGMA table_info` 探列 + `ALTER TABLE ... ADD COLUMN`，并补 `TestMigrateV1Database` 覆盖 v1 老库升级 | SQLite 改表结构只有 `ALTER TABLE` 真生效，建表语句只服务于新库 |
+| 加列后 `sql: expected 13 destination arguments in Scan, not 11` | 列常量 `projectColumns` 加了列，`scanProject` 的 `Scan` 实参没同步 | 列常量、`Scan` 实参、INSERT 占位符、UPDATE 赋值四处同批改，顺序保持一致 | 项目字段的 4 个 SQL 触点必须一起改，漏一处只会在运行时炸 |
+| 卡片封面用 `object-fit: cover` 把示意图上下文字裁掉 | `cover` 按容器比例裁剪，而技术示意图原图比例 2.6、卡片容器 16:9 | 卡片改 `object-fit: contain`（保整图、留白用卡片底色），详情页封面按原比例自然高度 | 技术插图优先保证内容完整，定比容器配 `contain`；照片类素材才用 `cover` |
+| 详情页说明里的 `h2` 比「项目说明」这一节标题还大 | `.article-markdown h2` 是 1.5rem，而节标题只有默认 h2 尺寸 | 说明容器加 `.project-description`，把内嵌 `h2/h3` 降到 1.15rem / 1rem，并让首个子元素不留上边距 | 嵌进区块的 Markdown 不能直接沿用文章正文的字号阶梯，要和所在区块的标题层级对齐 |
+| 后台分页条下面又冒出一行「共 15 篇」，与分页条里的「共 15 篇」重复 | 先加了独立总条数行，后来才加分页条，两处都在显示总数 | 独立总条数行改为仅在 `totalPages === 1` 时渲染（此时没有分页条）；多页时交给分页条 | 同一信息只允许一个权威展示位；加新组件时要回头查旧文案是否重复 |
+| 后台笔记首页断言拿到 0 行，但分页信息已经显示 15 篇 | 表格 `rows.count()` 在接口返回前执行，随后分页条才渲染，属于各断言之间有时序差 | 断言前先 `wait_for_selector("tbody tr")` 等真实行出现 | 浏览器断言要等具体元素，不能靠 `networkidle` 之后立刻数节点 |
+| 想让登录框预填密码，但直接把密码写进 Vue 组件会随正式包一起发布 | 登录页是公开静态资源，任何访客都能从页面/源码读到管理员密码 | 凭据改为构建变量注入，只有 `scripts/build-test.sh` 打出的包预填；正式包 `grep` 计数为 0，并在 `build.sh` 加开关防误用 | 涉及凭据的「测试便利」必须按产物隔离，不能只靠记得改回来 |
+| 切换测试包后用户反馈「笔记和项目找不到了」 | 启动登录验收服务时给了新空库 `DATA_DIR=/tmp/dn-login` 并 `pkill` 掉原服务，用户看到的是空站；真实开发库是 `/tmp/dn-dev/notes.db`（8 项目 / 31 笔记），数据从未丢失 | 先用只读 sqlite 核对两个库的行数确认根因；备份真实库后用 `DATA_DIR=/tmp/dn-dev` 重启，前台恢复 30 篇已发布 + 8 个项目 | 启动服务前必须确认 `DATA_DIR` 指向哪份数据；杀旧服务前先记下它挂载的库，不能随便换新目录充测试 |
+| 切回真实库后，测试包预填的 `admin12345678` 登录失败（401） | 真实库的管理员密码此前在后台改过，与测试包预填的默认测试密码不同；bcrypt 哈希不可反推 | 前台内容不受影响；后台改用用户自己的密码登录，或经用户确认后重建测试包时通过 `VITE_TEST_PASSWORD` 注入正确密码 | 预填凭据只对“用同一套初始密码创建的库”有效；换库后要重新核对凭据，不要误判为登录功能坏了 |
 
 ## 待办清单
 
@@ -310,20 +523,21 @@ v1.3.9 · Section 3 已完成，Section 4 进行中：8 个项目共 31 篇，�
 3. ~~三篇早期占位笔记~~ —— 开发库重建后已不存在（`lan-discovery` / `sqlite-pure-go-driver` / `clipboard-history-design` 不再入库）
 4. `mailhub-imap-cursor.svg` 仍未在任何文章中被引用（`siteguard-origin.svg` 已随 `reverse-proxy-origin-403` 上线）；本轮 3 篇纯文字，没有插图
 5. `tools/import-notes.sh` 目前只处理新建与更新，未做正文配图上传（插图仍走 `web/public/media/`）
-6. 项目元数据（名称/摘要/技术栈）只存在于数据库，重建开发库要手工补录；考虑加一份 `content/projects.json` + 入库脚本，避免下次重来
+6. 项目元数据（名称/摘要/技术栈/说明/封面路径）只存在于数据库，重建开发库要手工补录；考虑加一份 `content/projects.json` + 入库脚本，避免下次重来
 7. Section 5：Docker + 1Panel 部署 + 浏览器验收
 8. 每个 Section 完成后升小版本、同步文档并提交
 
 ## 版本一致性检查
 
-当前需要保持一致的四处：
+当前需要保持一致的五处：
 
 | 位置 | 当前值 |
 |---|---|
-| `app/VERSION` / `app/main.go` | `1.3.9` |
-| `web/package.json` / `web/package-lock.json` | `1.3.9` |
-| `web/src/components/SiteFooter.vue` / 后台侧栏 / 登录页 | `v1.3.9 by Mr lin` |
-| `doc/*.md` / `README.md` / `CHANGELOG.md` | `v1.3.9` |
+| `app/VERSION` / `app/main.go` | `1.4.4` |
+| `web/package.json` / `web/package-lock.json` | `1.4.4` |
+| `web/src/version.ts` | `APP_VERSION = '1.4.4'` |
+| `web/src/views/AboutView.vue` / 后台侧栏 / 登录页 | `{{ VERSION_LINE }}` → `v1.4.4 by Mr lin` |
+| `doc/*.md` / `README.md` / `CHANGELOG.md` | `v1.4.4` |
 
 `scripts/build.sh` 在编译前校验 `app/main.go` 的 `var version` 与 `app/VERSION` 一致，不一致直接失败。原型工程 `prototype/` 仍为 `v1.0.3`，作为冻结基线不再跟随版本。
 
@@ -342,6 +556,12 @@ bash scripts/build.sh          # 产物：app/build/dev-notes
 cd app && DATA_DIR=/tmp/dn-dev SESSION_SECRET=0123456789abcdef0123456789abcdef \
   HTTP_ADDR=127.0.0.1:8080 go run .
 cd web && npm run dev          # Vite 已把 /api 代理到 127.0.0.1:8080
+
+# 启动已打包的二进制做验收：必须挂真实开发库 /tmp/dn-dev
+DATA_DIR=/tmp/dn-dev HTTP_ADDR=:18091 \
+  SESSION_SECRET=0123456789abcdef0123456789abcdef ./app/build/dev-notes
 ```
+
+`DATA_DIR` 决定看到哪份内容：真实开发库在 `/tmp/dn-dev/notes.db`（8 个项目 / 31 篇笔记）；临时库（如 `/tmp/dn-login`）只有造数数据。重启前先确认旧服务挂载的目录，不要直接换新目录，否则会表现为「笔记和项目找不到」。管理员密码若在后台改过，测试包预填的默认密码会失效，需用当前密码登录或重建测试包时通过 `VITE_TEST_PASSWORD` 注入。运行时上传的图片写入 `DATA_DIR/media/`，备份时要一并带上；构建产物 `web/public/media/` 里的预置图仍随二进制发布。
 
 详细说明见 `doc/DEPLOY.md` 第二节与 `doc/PROJECT.md` 第七节。

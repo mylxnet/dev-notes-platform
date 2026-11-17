@@ -7,6 +7,7 @@ import {
   fetchNotes,
   fetchProjects,
   formatDate,
+  projectStatusText,
   techStackOf,
   type Note,
   type Project
@@ -15,6 +16,8 @@ import {
 const panelNotes = ref<Note[]>([])
 const recentNotes = ref<Note[]>([])
 const indexProjects = ref<Project[]>([])
+/** 已公开项目总数：首页只展示前两个，数字要取全量。 */
+const projectTotal = ref(0)
 const loading = ref(true)
 const error = ref('')
 
@@ -29,11 +32,13 @@ async function load() {
     recentNotes.value = notesResult.items
     panelNotes.value = notesResult.items.slice(0, 3)
     indexProjects.value = projectsResult.items.slice(0, 2)
+    projectTotal.value = projectsResult.total
   } catch (err) {
     error.value = errorMessageOf(err)
     recentNotes.value = []
     panelNotes.value = []
     indexProjects.value = []
+    projectTotal.value = 0
   } finally {
     loading.value = false
   }
@@ -49,7 +54,7 @@ onMounted(load)
         <div class="eyebrow">个人开发记录</div>
         <h1>把写过的代码，<br />整理成能回看的笔记</h1>
         <p class="lead">
-          这里记录我在学习软件开发过程中的技术笔记、问题排查与项目复盘。内容仅作个人非经营性分享，项目只提供源码入口，不提供任何下载。
+          这里记录我在学习软件开发过程中的技术笔记、问题排查与项目复盘。
         </p>
         <div class="hero-actions">
           <RouterLink to="/notes" class="btn btn-primary">浏览全部笔记</RouterLink>
@@ -111,7 +116,7 @@ onMounted(load)
       <div class="section-head">
         <div>
           <h2 class="section-title">项目索引</h2>
-          <div class="section-subtitle">个人练习作品，仅作记录与源码外链</div>
+          <div class="section-subtitle">个人练习作品，共 {{ projectTotal }} 个</div>
         </div>
         <RouterLink to="/projects" class="link-more">全部项目 →</RouterLink>
       </div>
@@ -127,7 +132,9 @@ onMounted(load)
         <RouterLink v-for="project in indexProjects" :key="project.id" :to="`/projects/${project.slug}`" class="project-card">
           <div class="project-top">
             <span class="project-name">{{ project.name }}</span>
-            <span class="status status-published">已发布</span>
+            <span class="status" :class="`status-${project.status}`">
+              {{ projectStatusText[project.status] }}
+            </span>
           </div>
           <p class="project-summary">{{ project.summary }}</p>
           <div class="tech-list">

@@ -1,7 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
-import { createProject, listProjects, updateProject, type ProjectInput } from '../../admin'
+import {
+  createProject,
+  listProjects,
+  previewMarkdown,
+  updateProject,
+  uploadMedia,
+  type ProjectInput
+} from '../../admin'
 import { ApiError, errorMessageOf, statusText, type ContentStatus } from '../../api'
 
 const route = useRoute()
@@ -24,11 +31,57 @@ const form = ref({
   summary: '',
   techText: '',
   repo_url: '',
+  description: '',
+  cover_image: '',
   sort_order: 0,
   status: 'draft' as ContentStatus
 })
 
 const statuses: ContentStatus[] = ['published', 'draft', 'hidden']
+
+const showDescriptionPreview = ref(false)
+const descriptionHtml = ref('')
+const previewLoading = ref(false)
+
+const coverFileInput = ref<HTMLInputElement | null>(null)
+const uploadingCover = ref(false)
+const coverUploadError = ref('')
+
+/** 与服务端一致：只收 PNG/JPG/WEBP，单张不超过 2 MB。 */
+async function onCoverSelected(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+
+  coverUploadError.value = ''
+  if (!/\.(png|jpe?g|webp)$/i.test(file.name)) {
+    coverUploadError.value = '只支持 PNG、JPG、WEBP 图片。'
+    return
+  }
+  if (file.size > 2 * 1024 * 1024) {
+    coverUploadError.value = '图片不能超过 2 MB。'
+    return
+  }
+
+  uploadingCover.value = true
+  try {
+    const result = await uploadMedia(file)
+    form.value.cover_image = result.path
+    dirty.value = true
+  } catch (err) {
+    coverUploadError.value = errorMessageOf(err)
+  } finally {
+    uploadingCover.value = false
+  }
+}
+
+/** 说明上限按 UTF-8 字节算，与后端 maxDescriptionBytes 保持一致。 */
+const maxDescriptionBytes = 20 * 1024
+
+function descriptionBytes(): number {
+  return new TextEncoder().encode(form.value.description).length
+}
 
 function toInput(): ProjectInput {
   return {
@@ -40,6 +93,8 @@ function toInput(): ProjectInput {
       .map((item) => item.trim())
       .filter(Boolean),
     repo_url: form.value.repo_url.trim(),
+    description: form.value.description.trim(),
+    cover_image: form.value.cover_image.trim(),
     sort_order: Number(form.value.sort_order) || 0,
     status: form.value.status
   }
@@ -65,6 +120,15 @@ function validateLocally(): boolean {
   }
   if (form.value.repo_url.trim() && !/^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\.git)?\/?$/.test(form.value.repo_url.trim())) {
     fieldError.value = { field: 'repo_url', message: '源码地址仅允许 GitHub 仓库地址（https://github.com/owner/repo）' }
+    return false
+  }
+  if (descriptionBytes() > maxDescriptionBytes) {
+    fieldError.value = { field: 'description', message: '项目说明不超过 20 KB' }
+    return false
+  }
+  const cover = form.value.cover_image.trim()
+  if (cover && (!/^\/(?:assets|media)\/[A-Za-z0-9._~/-]+\.(?:png|jpe?g|webp|svg|gif)$/.test(cover) || cover.includes('..') || cover.includes('//'))) {
+    fieldError.value = { field: 'cover_image', message: '封面图需填站内路径，如 /media/projects/example.png' }
     return false
   }
   return true
@@ -100,6 +164,23 @@ async function save() {
   }
 }
 
+async function toggleDescriptionPreview() {
+  if (showDescriptionPreview.value) {
+    showDescriptionPreview.value = false
+    return
+  }
+  previewLoading.value = true
+  error.value = ''
+  try {
+    descriptionHtml.value = await previewMarkdown(form.value.description)
+    showDescriptionPreview.value = true
+  } catch (err) {
+    error.value = errorMessageOf(err)
+  } finally {
+    previewLoading.value = false
+  }
+}
+
 watch(
   form,
   () => {
@@ -123,6 +204,8 @@ onMounted(async () => {
       summary: project.summary,
       techText: (project.tech_stack ?? []).join('、'),
       repo_url: project.repo_url,
+      description: project.description ?? '',
+      cover_image: project.cover_image ?? '',
       sort_order: project.sort_order,
       status: project.status
     }
@@ -189,6 +272,27 @@ onBeforeRouteLeave(() => {
         源码仓库
         <input v-model="form.repo_url" type="url" placeholder="https://github.com/owner/repo" />
       </label>
+      <div class="field-block">
+        <label>
+          封面图（站内路径或上传）
+          <input v-model="form.cover_image" type="text" placeholder="/media/uploads/随机文件名.png" />
+        </label>
+        <div class="row-actions">
+          <input
+            ref="coverFileInput"
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            hidden
+            @change="onCoverSelected"
+          />
+          <button class="btn" type="button" :disabled="uploadingCover || saving" @click="coverFileInput?.click()">
+            {{ uploadingCover ? '上传中…' : '选择图片上传' }}
+          </button>
+          <span class="section-subtitle">PNG / JPG / WEBP，≤ 2 MB；上传后自动填入路径，无需重新打包。</span>
+        </div>
+        <span v-if="coverUploadError" class="field-error" role="alert">{{ coverUploadError }}</span>
+        <img v-if="form.cover_image.trim()" class="cover-preview" :src="form.cover_image.trim()" alt="封面预览" />
+      </div>
 
       <div class="editor-row">
         <label>
@@ -201,6 +305,28 @@ onBeforeRouteLeave(() => {
           排序
           <input v-model.number="form.sort_order" type="number" min="0" max="9999" />
         </label>
+      </div>
+
+      <div class="field-block">
+        <div class="field-head">
+          <span>项目说明（Markdown，可留空）</span>
+          <span class="section-subtitle">{{ descriptionBytes() }} / {{ maxDescriptionBytes }} 字节</span>
+        </div>
+        <textarea
+          v-model="form.description"
+          class="editor-textarea"
+          placeholder="支持标题、列表、代码块、表格；不允许原始 HTML 与外链图片"
+        />
+        <div class="row-actions" style="margin-top: 10px">
+          <button class="btn" type="button" :disabled="previewLoading || saving" @click="toggleDescriptionPreview">
+            {{ previewLoading ? '渲染中…' : showDescriptionPreview ? '关闭预览' : '预览说明' }}
+          </button>
+        </div>
+      </div>
+
+      <div v-if="showDescriptionPreview">
+        <div class="section-subtitle">预览（服务端渲染并净化）</div>
+        <div class="article-markdown preview-panel" v-html="descriptionHtml" />
       </div>
 
       <div class="row-actions">

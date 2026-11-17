@@ -29,8 +29,14 @@ type Project struct {
 	Summary   string   `json:"summary"`
 	TechStack []string `json:"tech_stack"`
 	RepoURL   string   `json:"repo_url"`
-	SortOrder int      `json:"sort_order"`
-	Status    Status   `json:"status"`
+	// Description 是项目说明的 Markdown 原文，后台编辑用。
+	Description string `json:"description"`
+	// CoverImage 是封面图的站内路径（如 /media/projects/xxx.png），空串表示没有封面。
+	CoverImage string `json:"cover_image"`
+	// DescriptionHTML 是渲染并净化后的说明，只出现在前台详情接口。
+	DescriptionHTML string `json:"description_html,omitempty"`
+	SortOrder       int    `json:"sort_order"`
+	Status          Status `json:"status"`
 	// NoteCount 是该项目下已发布笔记的数量，由查询统计，不写入 project 表。
 	NoteCount int       `json:"note_count"`
 	CreatedAt time.Time `json:"created_at"`

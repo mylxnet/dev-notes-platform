@@ -20,7 +20,7 @@ var (
 	ErrConflict = errors.New("record conflict")
 )
 
-const schemaVersion = 1
+const schemaVersion = 3
 
 // Store 封装 SQLite 连接与迁移。
 type Store struct {
@@ -88,11 +88,51 @@ func (s *Store) migrate(ctx context.Context) error {
 	}
 	defer tx.Rollback()
 
-	for _, statement := range schemaStatements {
-		if _, err := tx.ExecContext(ctx, statement); err != nil {
-			return fmt.Errorf("apply schema: %w", err)
+	// v1：建表。老库已是 v1 时跳过，新库依次走完全部版本。
+	if current < 1 {
+		for _, statement := range schemaStatements {
+			if _, err := tx.ExecContext(ctx, statement); err != nil {
+				return fmt.Errorf("apply schema: %w", err)
+			}
 		}
 	}
+
+	// v2：项目增加说明与封面图，按列存在性判断，避免迁移中断后重跑报错。
+	if current < 2 {
+		columns := []struct {
+			table string
+			name  string
+			spec  string
+		}{
+			{"project", "description", "TEXT NOT NULL DEFAULT ''"},
+			{"project", "cover_image", "TEXT NOT NULL DEFAULT ''"},
+		}
+		for _, column := range columns {
+			exists, err := columnExists(ctx, tx, column.table, column.name)
+			if err != nil {
+				return err
+			}
+			if exists {
+				continue
+			}
+			statement := fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", column.table, column.name, column.spec)
+			if _, err := tx.ExecContext(ctx, statement); err != nil {
+				return fmt.Errorf("add column %s.%s: %w", column.table, column.name, err)
+			}
+		}
+	}
+
+	// v3：站点配置键值表，当前存备案号；新建库也走这里，与老库同一路径。
+	if current < 3 {
+		if _, err := tx.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS settings (
+			key        TEXT PRIMARY KEY,
+			value      TEXT NOT NULL DEFAULT '',
+			updated_at TEXT NOT NULL
+		)`); err != nil {
+			return fmt.Errorf("create settings table: %w", err)
+		}
+	}
+
 	if _, err := tx.ExecContext(ctx, fmt.Sprintf("PRAGMA user_version = %d", schemaVersion)); err != nil {
 		return fmt.Errorf("set schema version: %w", err)
 	}
@@ -100,6 +140,33 @@ func (s *Store) migrate(ctx context.Context) error {
 		return fmt.Errorf("commit migration: %w", err)
 	}
 	return nil
+}
+
+// columnExists 用 PRAGMA table_info 判断列是否存在，让 ALTER TABLE 迁移可以安全重跑。
+func columnExists(ctx context.Context, tx *sql.Tx, table, column string) (bool, error) {
+	rows, err := tx.QueryContext(ctx, fmt.Sprintf("PRAGMA table_info(%s)", table))
+	if err != nil {
+		return false, fmt.Errorf("read table info %s: %w", table, err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			cid     int
+			name    string
+			ctype   string
+			notNull int
+			dflt    sql.NullString
+			pk      int
+		)
+		if err := rows.Scan(&cid, &name, &ctype, &notNull, &dflt, &pk); err != nil {
+			return false, fmt.Errorf("scan table info %s: %w", table, err)
+		}
+		if name == column {
+			return true, nil
+		}
+	}
+	return false, rows.Err()
 }
 
 var schemaStatements = []string{
@@ -145,7 +212,8 @@ var schemaStatements = []string{
 }
 
 // projectColumns 额外统计已发布笔记数，前台项目卡片据此展示，避免逐个请求详情。
-const projectColumns = `id, name, slug, summary, tech_stack, repo_url, sort_order, status, created_at, updated_at,
+const projectColumns = `id, name, slug, summary, tech_stack, repo_url, description, cover_image,
+	sort_order, status, created_at, updated_at,
 	(SELECT COUNT(*) FROM note WHERE note.project_id = project.id AND note.status = 'published')`
 
 const noteColumns = `n.id, n.title, n.slug, n.summary, n.content, n.project_id, p.name, p.slug, n.status, n.published_at, n.created_at, n.updated_at`
@@ -164,6 +232,8 @@ func scanProject(scanner rowScanner) (*model.Project, error) {
 		&project.Summary,
 		&techStack,
 		&project.RepoURL,
+		&project.Description,
+		&project.CoverImage,
 		&project.SortOrder,
 		&project.Status,
 		&createdAt,

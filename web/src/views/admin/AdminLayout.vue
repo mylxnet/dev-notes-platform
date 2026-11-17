@@ -2,6 +2,8 @@
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { fetchSession, logout, onUnauthorized, type AdminInfo } from '../../admin'
+import BrandLogo from '../../components/BrandLogo.vue'
+import { VERSION_LINE } from '../../version'
 
 const router = useRouter()
 const route = useRoute()
@@ -46,16 +48,17 @@ async function onLogout() {
   <div class="admin-shell">
     <aside class="admin-sidebar">
       <div class="admin-brand">
-        <span class="brand-mark">N</span>
+        <BrandLogo />
         <span>内容管理</span>
       </div>
       <nav class="admin-nav" aria-label="后台导航">
         <RouterLink to="/admin/notes">笔记管理</RouterLink>
         <RouterLink to="/admin/projects">项目管理</RouterLink>
         <RouterLink to="/admin/account">账号设置</RouterLink>
+        <RouterLink to="/admin/settings">站点设置</RouterLink>
       </nav>
       <div class="admin-side-note">
-        v1.3.9 by Mr lin<br />
+        {{ VERSION_LINE }}<br />
         单管理员账号 · 不开放注册
       </div>
     </aside>

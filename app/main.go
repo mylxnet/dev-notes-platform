@@ -16,7 +16,7 @@ import (
 	"dev-notes-platform/internal/store"
 )
 
-var version = "1.3.9"
+var version = "1.4.4"
 
 func main() {
 	if err := run(); err != nil {
@@ -61,7 +61,7 @@ func run() error {
 	}
 
 	sessions := auth.NewManager(cfg.SessionSecret, auth.CookieSecureMode(cfg.CookieSecureMode))
-	router := api.New(st, version, sessions)
+	router := api.New(st, version, sessions, cfg.DataDir+"/media")
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,
 		Handler:           router,

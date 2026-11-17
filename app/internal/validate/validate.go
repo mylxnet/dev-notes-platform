@@ -12,14 +12,15 @@ import (
 )
 
 const (
-	maxTitleRunes    = 120
-	maxSummaryRunes  = 300
-	maxContentBytes  = 100 * 1024
-	maxTechStackSize = 10
-	maxTechItemRunes = 30
-	minSlugRunes     = 2
-	maxSlugRunes     = 80
-	minPasswordRunes = 12
+	maxTitleRunes       = 120
+	maxSummaryRunes     = 300
+	maxContentBytes     = 100 * 1024
+	maxDescriptionBytes = 20 * 1024
+	maxTechStackSize    = 10
+	maxTechItemRunes    = 30
+	minSlugRunes        = 2
+	maxSlugRunes        = 80
+	minPasswordRunes    = 12
 )
 
 // FieldError 描述单个字段的校验失败，API 层据此返回 422。
@@ -39,9 +40,13 @@ func fail(field, message string) *FieldError {
 var (
 	slugPattern = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
 	repoPattern = regexp.MustCompile(`^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(?:\.git)?/?$`)
+	// 封面只允许站内路径，与渲染层放行的图片前缀保持一致。
+	coverPattern = regexp.MustCompile(`^/(?:assets|media)/[A-Za-z0-9._~/-]+\.(?:png|jpe?g|webp|svg|gif)$`)
 	// 密码要求同时含字母与数字。
 	hasLetter = regexp.MustCompile(`[A-Za-z]`)
 	hasDigit  = regexp.MustCompile(`[0-9]`)
+	// 备案号只允许汉字、字母、数字与连字符，例如「甘ICP备12345678号-1」。
+	icpPattern = regexp.MustCompile(`^[\p{Han}A-Za-z0-9-]{5,100}$`)
 )
 
 // 硬拦截：经营性词汇，个人非经营性备案站点不得出现。
@@ -79,6 +84,12 @@ func Project(p *model.Project) *FieldError {
 	if p.RepoURL != "" && !repoPattern.MatchString(p.RepoURL) {
 		return fail("repo_url", "源码地址仅允许 GitHub 仓库地址（https://github.com/owner/repo）")
 	}
+	if len(p.Description) > maxDescriptionBytes {
+		return fail("description", "项目说明不超过 20 KB")
+	}
+	if p.CoverImage != "" && !validCover(p.CoverImage) {
+		return fail("cover_image", "封面图需填站内路径，如 /media/projects/example.png")
+	}
 	if !p.Status.Valid() {
 		return fail("status", "内容状态不合法")
 	}
@@ -86,8 +97,9 @@ func Project(p *model.Project) *FieldError {
 		return fail("sort_order", "排序值需为 0–9999")
 	}
 	return scanAll(map[string]string{
-		"name":    p.Name,
-		"summary": p.Summary,
+		"name":        p.Name,
+		"summary":     p.Summary,
+		"description": p.Description,
 	})
 }
 
@@ -139,6 +151,14 @@ func Password(value string) *FieldError {
 	return nil
 }
 
+// validCover 只放行站内图片路径，并挡掉 .. 之类的目录穿越写法。
+func validCover(value string) bool {
+	if strings.Contains(value, "..") || strings.Contains(value, "//") {
+		return false
+	}
+	return coverPattern.MatchString(value)
+}
+
 func text(field, value string, min, max int, message string) *FieldError {
 	length := utf8.RuneCountInString(strings.TrimSpace(value))
 	if length < min || length > max {
@@ -149,7 +169,7 @@ func text(field, value string, min, max int, message string) *FieldError {
 
 // scanAll 按固定顺序扫描字段，保证同一份内容每次返回的错误一致。
 func scanAll(fields map[string]string) *FieldError {
-	order := []string{"title", "name", "summary", "content"}
+	order := []string{"title", "name", "summary", "content", "description"}
 	for _, field := range order {
 		value, ok := fields[field]
 		if !ok {
@@ -158,6 +178,17 @@ func scanAll(fields map[string]string) *FieldError {
 		if err := scanText(field, value); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// ICPNumber 校验站点备案号；空串表示清空备案号，恢复页脚占位文案。
+func ICPNumber(value string) *FieldError {
+	if value == "" {
+		return nil
+	}
+	if !icpPattern.MatchString(value) {
+		return fail("icp_number", "备案号需为 5–100 个汉字、字母、数字或连字符，例如 甘ICP备12345678号-1")
 	}
 	return nil
 }

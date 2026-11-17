@@ -13,6 +13,7 @@ import AdminNoteEditView from './views/admin/AdminNoteEditView.vue'
 import AdminProjectsView from './views/admin/AdminProjectsView.vue'
 import AdminProjectEditView from './views/admin/AdminProjectEditView.vue'
 import AdminAccountView from './views/admin/AdminAccountView.vue'
+import AdminSettingsView from './views/admin/AdminSettingsView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -35,7 +36,8 @@ const router = createRouter({
         { path: 'projects', name: 'admin-projects', component: AdminProjectsView },
         { path: 'projects/new', name: 'admin-project-new', component: AdminProjectEditView },
         { path: 'projects/:id/edit', name: 'admin-project-edit', component: AdminProjectEditView },
-        { path: 'account', name: 'admin-account', component: AdminAccountView }
+        { path: 'account', name: 'admin-account', component: AdminAccountView },
+        { path: 'settings', name: 'admin-settings', component: AdminSettingsView }
       ]
     },
     { path: '/:pathMatch(.*)*', redirect: '/' }

@@ -1,20 +1,24 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import EmptyState from '../../components/EmptyState.vue'
+import Pager from '../../components/Pager.vue'
 import { deleteNote, listNotes } from '../../admin'
 import { errorMessageOf, formatDate, statusText, type ContentStatus, type Note } from '../../api'
 
-const router = useRouter()
+/** 与前台笔记列表一致：每页 6 条，翻页由后端分页承担。 */
+const PAGE_SIZE = 6
 
 const notes = ref<Note[]>([])
 const total = ref(0)
+const page = ref(1)
 const loading = ref(true)
 const error = ref('')
 const statusFilter = ref<'all' | ContentStatus>('all')
 const keyword = ref('')
 const pendingDelete = ref<number | null>(null)
 const deleting = ref(false)
+
+const totalPages = computed(() => Math.max(1, Math.ceil(total.value / PAGE_SIZE)))
 
 let searchTimer: number | undefined
 
@@ -25,10 +29,18 @@ async function load() {
     const result = await listNotes({
       status: statusFilter.value === 'all' ? undefined : statusFilter.value,
       keyword: keyword.value.trim() || undefined,
-      pageSize: 50
+      page: page.value,
+      pageSize: PAGE_SIZE
     })
     notes.value = result.items
     total.value = result.total
+
+    // 筛选、搜索或删除把总页数压小后，当前页可能越界，退到最后一页重新取。
+    const lastPage = Math.max(1, Math.ceil(result.total / PAGE_SIZE))
+    if (page.value > lastPage) {
+      page.value = lastPage
+      void load()
+    }
   } catch (err) {
     error.value = errorMessageOf(err)
     notes.value = []
@@ -38,15 +50,27 @@ async function load() {
   }
 }
 
+function goTo(target: number) {
+  const clamped = Math.min(Math.max(1, target), totalPages.value)
+  if (clamped === page.value) return
+  page.value = clamped
+  void load()
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
 function setStatus(value: 'all' | ContentStatus) {
   if (statusFilter.value === value) return
   statusFilter.value = value
-  load()
+  page.value = 1
+  void load()
 }
 
 watch(keyword, () => {
   window.clearTimeout(searchTimer)
-  searchTimer = window.setTimeout(load, 300)
+  searchTimer = window.setTimeout(() => {
+    page.value = 1
+    void load()
+  }, 300)
 })
 
 async function confirmDelete(id: number) {
@@ -133,6 +157,18 @@ onUnmounted(() => window.clearTimeout(searchTimer))
     </div>
     <EmptyState v-else title="没有匹配的笔记" description="调整状态筛选或搜索关键词，或新建一篇笔记。" />
 
-    <p class="section-subtitle" style="margin-top: 14px">共 {{ total }} 篇</p>
+    <!-- 只有一页时没有分页条，用这行补上总数；多页时总数由分页条承担，避免重复。 -->
+    <p v-if="!loading && total && totalPages === 1" class="admin-total">共 {{ total }} 篇</p>
+
+    <div v-if="!loading" class="admin-pager">
+      <Pager
+        :page="page"
+        :total-pages="totalPages"
+        :total="total"
+        unit="篇"
+        label="后台笔记分页"
+        @change="goTo"
+      />
+    </div>
   </div>
 </template>

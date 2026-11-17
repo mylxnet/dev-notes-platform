@@ -28,12 +28,14 @@ func newTestServer(t *testing.T) http.Handler {
 	})
 
 	project := &model.Project{
-		Name:      "SiteGuard",
-		Slug:      "siteguard",
-		Summary:   "站点巡检工具",
-		TechStack: []string{"Go"},
-		RepoURL:   "https://github.com/example/siteguard",
-		Status:    model.StatusPublished,
+		Name:        "SiteGuard",
+		Slug:        "siteguard",
+		Summary:     "站点巡检工具",
+		TechStack:   []string{"Go"},
+		RepoURL:     "https://github.com/example/siteguard",
+		Description: "## 定位\n\n这是**练习**项目。",
+		CoverImage:  "/media/projects/siteguard.svg",
+		Status:      model.StatusPublished,
 	}
 	if _, err := st.CreateProject(context.Background(), project); err != nil {
 		t.Fatalf("create project: %v", err)
@@ -62,7 +64,7 @@ func newTestServer(t *testing.T) http.Handler {
 		t.Fatalf("create draft note: %v", err)
 	}
 
-	return New(st, "test", auth.NewManager(strings.Repeat("t", 32), auth.CookieSecureNever))
+	return New(st, "test", auth.NewManager(strings.Repeat("t", 32), auth.CookieSecureNever), filepath.Join(t.TempDir(), "media"))
 }
 
 func TestHealth(t *testing.T) {
@@ -166,6 +168,47 @@ func TestProjectDetailIncludesPublishedNotes(t *testing.T) {
 	}
 	if body.Data.Project.Slug != "siteguard" || body.Data.NoteCount != 1 || len(body.Data.Notes) != 1 {
 		t.Fatalf("unexpected project detail: %+v", body.Data)
+	}
+	// 前台拿到的是净化后的 HTML，Markdown 原文不下发。
+	if !strings.Contains(body.Data.Project.DescriptionHTML, "<h2>定位</h2>") ||
+		!strings.Contains(body.Data.Project.DescriptionHTML, "<strong>练习</strong>") {
+		t.Fatalf("expected rendered description html, got %q", body.Data.Project.DescriptionHTML)
+	}
+	if body.Data.Project.Description != "" {
+		t.Fatalf("expected raw description hidden, got %q", body.Data.Project.Description)
+	}
+	if body.Data.Project.CoverImage != "/media/projects/siteguard.svg" {
+		t.Fatalf("expected cover image, got %q", body.Data.Project.CoverImage)
+	}
+}
+
+func TestProjectListOmitsDescriptionSource(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := newTestServer(t)
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/projects", nil)
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", recorder.Code)
+	}
+	var body struct {
+		Data struct {
+			Items []model.Project `json:"items"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode projects: %v", err)
+	}
+	if len(body.Data.Items) != 1 {
+		t.Fatalf("expected one project, got %+v", body.Data)
+	}
+	if body.Data.Items[0].Description != "" {
+		t.Fatalf("expected list without description, got %q", body.Data.Items[0].Description)
+	}
+	// 卡片封面仍需下发。
+	if body.Data.Items[0].CoverImage != "/media/projects/siteguard.svg" {
+		t.Fatalf("expected cover image in list, got %q", body.Data.Items[0].CoverImage)
 	}
 }
 

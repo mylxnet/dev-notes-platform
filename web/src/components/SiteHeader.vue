@@ -1,8 +1,12 @@
+<script setup lang="ts">
+import BrandLogo from './BrandLogo.vue'
+</script>
+
 <template>
   <header class="site-header">
     <div class="container header-inner">
       <RouterLink to="/" class="brand">
-        <span class="brand-mark">N</span>
+        <BrandLogo />
         <span>我的开发笔记</span>
       </RouterLink>
       <nav class="nav" aria-label="主导航">
@@ -11,9 +15,6 @@
         <RouterLink to="/projects">项目</RouterLink>
         <RouterLink to="/about">关于</RouterLink>
       </nav>
-      <div class="header-actions">
-        <RouterLink to="/admin/notes" class="btn btn-ghost">后台管理</RouterLink>
-      </div>
     </div>
   </header>
 </template>

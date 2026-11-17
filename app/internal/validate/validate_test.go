@@ -60,6 +60,53 @@ func TestProjectRejectsTooManyTechItems(t *testing.T) {
 	}
 }
 
+func TestProjectCoverImageRules(t *testing.T) {
+	cases := []struct {
+		value string
+		ok    bool
+	}{
+		{"", true},
+		{"/media/projects/siteguard.svg", true},
+		{"/media/projects/siteguard-cover.png", true},
+		{"https://example.com/cover.png", false},
+		{"media/projects/a.png", false},
+		{"/media/projects/a.exe", false},
+		{"/media/../secret.png", false},
+	}
+	for _, tc := range cases {
+		project := validProject()
+		project.CoverImage = tc.value
+		err := Project(project)
+		if tc.ok && err != nil {
+			t.Fatalf("%q: expected ok, got %+v", tc.value, err)
+		}
+		if !tc.ok && (err == nil || err.Field != "cover_image") {
+			t.Fatalf("%q: expected cover_image error, got %+v", tc.value, err)
+		}
+	}
+}
+
+func TestProjectDescriptionRules(t *testing.T) {
+	project := validProject()
+	project.Description = strings.Repeat("a", maxDescriptionBytes+1)
+	if err := Project(project); err == nil || err.Field != "description" {
+		t.Fatalf("expected description size error, got %+v", err)
+	}
+
+	// 说明里的 Markdown 正文同样要过备案词扫描。
+	project = validProject()
+	project.Description = "## 说明\n\n本项目提供在线支付"
+	if err := Project(project); err == nil || err.Field != "description" {
+		t.Fatalf("expected description blocked, got %+v", err)
+	}
+
+	project = validProject()
+	project.Description = "## 说明\n\n源码仓库地址见详情页。"
+	if err := Project(project); err != nil {
+		t.Fatalf("expected allowed description, got %+v", err)
+	}
+}
+
 func TestProjectBlocksCommercialWords(t *testing.T) {
 	project := validProject()
 	project.Summary = "支持在线支付与会员订阅"

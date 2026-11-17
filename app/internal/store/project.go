@@ -32,11 +32,19 @@ func (s *Store) ListPublishedProjects(ctx context.Context) ([]model.Project, err
 	return projects, rows.Err()
 }
 
-// ListAllProjects 返回全部状态的项目，供后台使用。
-func (s *Store) ListAllProjects(ctx context.Context) ([]model.Project, error) {
+// AdminProjectFilter 是后台项目列表的分页参数。
+type AdminProjectFilter struct {
+	Limit  int
+	Offset int
+}
+
+// ListAllProjects 返回全部状态的项目，供后台使用；按排序值与 ID 稳定分页。
+func (s *Store) ListAllProjects(ctx context.Context, filter AdminProjectFilter) ([]model.Project, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT `+projectColumns+`
 		FROM project
-		ORDER BY sort_order ASC, id ASC`)
+		ORDER BY sort_order ASC, id ASC
+		LIMIT ? OFFSET ?`,
+		normalizeLimit(filter.Limit), normalizeOffset(filter.Offset))
 	if err != nil {
 		return nil, fmt.Errorf("list projects: %w", err)
 	}
@@ -51,6 +59,15 @@ func (s *Store) ListAllProjects(ctx context.Context) ([]model.Project, error) {
 		projects = append(projects, *project)
 	}
 	return projects, rows.Err()
+}
+
+// CountAllProjects 返回全部状态的项目总数，供后台分页使用。
+func (s *Store) CountAllProjects(ctx context.Context) (int, error) {
+	var count int
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM project`).Scan(&count); err != nil {
+		return 0, fmt.Errorf("count projects: %w", err)
+	}
+	return count, nil
 }
 
 // GetPublishedProjectBySlug 返回已发布项目详情。
@@ -91,13 +108,15 @@ func (s *Store) CreateProject(ctx context.Context, project *model.Project) (int6
 	}
 	now := nowText()
 	result, err := s.db.ExecContext(ctx, `INSERT INTO project
-		(name, slug, summary, tech_stack, repo_url, sort_order, status, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		(name, slug, summary, tech_stack, repo_url, description, cover_image, sort_order, status, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		project.Name,
 		project.Slug,
 		project.Summary,
 		string(techStack),
 		project.RepoURL,
+		project.Description,
+		project.CoverImage,
 		project.SortOrder,
 		project.Status,
 		now,
@@ -131,13 +150,15 @@ func (s *Store) UpdateProject(ctx context.Context, project *model.Project) error
 	now := nowText()
 	result, err := s.db.ExecContext(ctx, `UPDATE project SET
 		name = ?, slug = ?, summary = ?, tech_stack = ?, repo_url = ?,
-		sort_order = ?, status = ?, updated_at = ?
+		description = ?, cover_image = ?, sort_order = ?, status = ?, updated_at = ?
 		WHERE id = ?`,
 		project.Name,
 		project.Slug,
 		project.Summary,
 		string(techStack),
 		project.RepoURL,
+		project.Description,
+		project.CoverImage,
 		project.SortOrder,
 		project.Status,
 		now,

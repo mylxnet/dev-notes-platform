@@ -36,7 +36,7 @@ HTTP_ADDR=127.0.0.1:8080 \
 
 ## 三、数据持久化
 
-容器内 SQLite 路径：`/app/data/notes.db`
+容器内 SQLite 路径：`/app/data/notes.db`；后台上传的封面图在 `/app/data/media/`（备份时要一起带上，否则升级后图片丢失）。
 
 Compose 中绑定挂载到宿主机 1Panel 管理的目录，例如：
 
@@ -45,7 +45,7 @@ volumes:
   - /opt/1panel/apps/dev-notes/data:/app/data
 ```
 
-备份时直接复制该目录下的 `.db` 文件即可。
+备份时复制该目录下的 `.db` 文件与整个 `media/` 子目录即可（上传的图片不在数据库里）。
 
 ## 四、1Panel 部署步骤
 
@@ -69,8 +69,9 @@ volumes:
 | 操作 | 命令 / 位置 |
 |---|---|
 | 查看日志 | 1Panel 容器日志，或 `docker logs dev-notes` |
-| 备份数据 | 复制数据卷目录下 `notes.db` |
-| 升级 | 替换镜像后重新创建容器，数据卷不变 |
+| 备份数据 | 复制数据卷目录下 `notes.db` 与 `media/` 子目录 |
+| 升级 | 替换镜像后重新创建容器，数据卷不变；只部署 `scripts/build.sh` 产出的正式包，禁止使用 `scripts/build-test.sh` 的测试包（登录页含预填凭据） |
+| 结构升级 | 启动时自动执行迁移（`PRAGMA user_version` 推进）；v1 → v2 会自动给 `project` 补 `description` / `cover_image` 两列，已有数据与内容不受影响，升级前仍建议先备份 `notes.db` |
 | 修改管理员密码 | 登录后进后台「账号」页 |
 
 ## 七、回滚

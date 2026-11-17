@@ -1,5 +1,14 @@
 // 管理端接口封装：统一注入 CSRF 头，并在 401 时通知路由跳转登录。
-import { ApiError, requestJSON, type ContentStatus, type Note, type PagedNotes, type Project } from './api'
+import {
+  ApiError,
+  requestJSON,
+  type ContentStatus,
+  type Note,
+  type PagedNotes,
+  type PagedProjects,
+  type Project,
+  type SiteInfo
+} from './api'
 
 export interface AdminInfo {
   id: number
@@ -24,6 +33,10 @@ export interface ProjectInput {
   summary: string
   tech_stack: string[]
   repo_url: string
+  /** 项目说明的 Markdown 原文，可留空。 */
+  description: string
+  /** 封面图站内路径，可留空表示没有封面。 */
+  cover_image: string
   sort_order: number
   status: ContentStatus
 }
@@ -134,8 +147,27 @@ export function deleteNote(id: number): Promise<{ ok: boolean }> {
   return adminRequest<{ ok: boolean }>(`/api/admin/notes/${id}`, { method: 'DELETE' })
 }
 
-export function listProjects(): Promise<{ items: Project[]; total: number }> {
-  return adminRequest<{ items: Project[]; total: number }>('/api/admin/projects')
+export function listProjects(params: { page?: number; pageSize?: number } = {}): Promise<PagedProjects> {
+  const query = new URLSearchParams()
+  if (params.page && params.page > 1) query.set('page', String(params.page))
+  if (params.pageSize) query.set('page_size', String(params.pageSize))
+  const suffix = query.toString()
+  return adminRequest<PagedProjects>(`/api/admin/projects${suffix ? `?${suffix}` : ''}`)
+}
+
+/** 上传项目封面图，返回可直接填进封面字段的站内路径。 */
+export function uploadMedia(file: File): Promise<{ path: string }> {
+  const form = new FormData()
+  form.append('file', file)
+  return adminRequest<{ path: string }>('/api/admin/media/upload', { method: 'POST', body: form })
+}
+
+export function fetchSettings(): Promise<SiteInfo> {
+  return adminRequest<SiteInfo>('/api/admin/settings')
+}
+
+export function updateSettings(input: SiteInfo): Promise<SiteInfo> {
+  return adminRequest<SiteInfo>('/api/admin/settings', { method: 'PUT', body: input })
 }
 
 export function createProject(input: ProjectInput): Promise<Project> {

@@ -13,13 +13,15 @@ import (
 )
 
 type projectInput struct {
-	Name      string       `json:"name"`
-	Slug      string       `json:"slug"`
-	Summary   string       `json:"summary"`
-	TechStack []string     `json:"tech_stack"`
-	RepoURL   string       `json:"repo_url"`
-	SortOrder int          `json:"sort_order"`
-	Status    model.Status `json:"status"`
+	Name        string       `json:"name"`
+	Slug        string       `json:"slug"`
+	Summary     string       `json:"summary"`
+	TechStack   []string     `json:"tech_stack"`
+	RepoURL     string       `json:"repo_url"`
+	Description string       `json:"description"`
+	CoverImage  string       `json:"cover_image"`
+	SortOrder   int          `json:"sort_order"`
+	Status      model.Status `json:"status"`
 }
 
 func (in *projectInput) toModel(id int64) *model.Project {
@@ -31,24 +33,42 @@ func (in *projectInput) toModel(id int64) *model.Project {
 		}
 	}
 	return &model.Project{
-		ID:        id,
-		Name:      strings.TrimSpace(in.Name),
-		Slug:      strings.TrimSpace(in.Slug),
-		Summary:   strings.TrimSpace(in.Summary),
-		TechStack: stack,
-		RepoURL:   strings.TrimSpace(in.RepoURL),
-		SortOrder: in.SortOrder,
-		Status:    in.Status,
+		ID:          id,
+		Name:        strings.TrimSpace(in.Name),
+		Slug:        strings.TrimSpace(in.Slug),
+		Summary:     strings.TrimSpace(in.Summary),
+		TechStack:   stack,
+		RepoURL:     strings.TrimSpace(in.RepoURL),
+		Description: strings.TrimSpace(in.Description),
+		CoverImage:  strings.TrimSpace(in.CoverImage),
+		SortOrder:   in.SortOrder,
+		Status:      in.Status,
 	}
 }
 
 func (s *Server) adminListProjects(c *gin.Context) {
-	projects, err := s.store.ListAllProjects(c.Request.Context())
+	page := positiveInt(c.Query("page"), 1)
+	pageSize := positiveInt(c.Query("page_size"), 20)
+	if pageSize > 100 {
+		pageSize = 100
+	}
+
+	filter := store.AdminProjectFilter{
+		Limit:  pageSize,
+		Offset: (page - 1) * pageSize,
+	}
+
+	projects, err := s.store.ListAllProjects(c.Request.Context(), filter)
 	if err != nil {
 		respondError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "项目列表加载失败")
 		return
 	}
-	respondOK(c, gin.H{"items": projects, "total": len(projects)})
+	total, err := s.store.CountAllProjects(c.Request.Context())
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "项目总数统计失败")
+		return
+	}
+	respondList(c, projects, total, page, pageSize)
 }
 
 func (s *Server) adminCreateProject(c *gin.Context) {

@@ -7,7 +7,7 @@ import {
   errorMessageOf,
   fetchProject,
   formatDate,
-  statusText,
+  projectStatusText,
   techStackOf,
   type Note,
   type Project
@@ -79,13 +79,24 @@ watch(
         <h1 class="section-title">{{ project.name }}</h1>
         <div class="section-subtitle">{{ project.summary }}</div>
       </div>
-      <span class="status" :class="`status-${project.status}`">{{ statusText[project.status] }}</span>
+      <span class="status" :class="`status-${project.status}`">
+        {{ projectStatusText[project.status] }}
+      </span>
     </div>
+
+    <figure v-if="project.cover_image" class="project-hero">
+      <img :src="project.cover_image" :alt="`${project.name} 封面`" />
+    </figure>
 
     <div class="about-grid">
       <div>
         <h2>项目说明</h2>
-        <p>
+        <div
+          v-if="project.description_html"
+          class="article-markdown project-description"
+          v-html="project.description_html"
+        />
+        <p v-else>
           这是个人练习过程中的阶段性记录。本站只描述项目定位与技术取舍，源码入口外链到 GitHub，不提供任何安装包或可执行文件。
         </p>
         <div class="tech-list">

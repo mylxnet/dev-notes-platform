@@ -17,6 +17,10 @@ func (s *Server) listProjects(c *gin.Context) {
 		respondError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "项目列表加载失败")
 		return
 	}
+	// 列表只给卡片需要的字段，长文说明不必随列表下发。
+	for i := range projects {
+		projects[i].Description = ""
+	}
 	respondOK(c, gin.H{"items": projects, "total": len(projects)})
 }
 
@@ -44,6 +48,10 @@ func (s *Server) getProject(c *gin.Context) {
 		respondError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "关联笔记统计失败")
 		return
 	}
+
+	// 前台只拿净化后的 HTML，说明源码不进公开响应。
+	project.DescriptionHTML = render.Markdown(project.Description)
+	project.Description = ""
 
 	respondOK(c, gin.H{
 		"project":    project,

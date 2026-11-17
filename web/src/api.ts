@@ -15,6 +15,12 @@ export interface Project {
   /** 后端可能返回 null，展示前需兜底为空数组。 */
   tech_stack: string[] | null
   repo_url: string
+  /** 项目说明的 Markdown 原文，只有后台接口下发。 */
+  description?: string
+  /** 封面图站内路径，空串或缺失表示没有封面。 */
+  cover_image?: string
+  /** 前台详情接口下发渲染并净化后的说明 HTML。 */
+  description_html?: string
   sort_order: number
   status: ContentStatus
   /** 已发布关联笔记数，由后端统计，避免前端逐个请求。 */
@@ -42,6 +48,19 @@ export interface Note {
 
 export interface PagedNotes {
   items: Note[]
+  total: number
+  page: number
+  page_size: number
+}
+
+/** 站点公开信息，页脚备案号由这里提供。 */
+export interface SiteInfo {
+  icp_number: string
+}
+
+/** 后台项目列表与公开项目列表的分页响应。 */
+export interface PagedProjects {
+  items: Project[]
   total: number
   page: number
   page_size: number
@@ -105,7 +124,9 @@ interface RequestOptions {
 /** 统一请求封装：JSON 编解码、错误归一化、可选取消与管理端自定义头。 */
 export async function requestJSON<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const headers: Record<string, string> = { Accept: 'application/json', ...options.headers }
-  if (options.body !== undefined) {
+  // FormData 由浏览器自动带 multipart 边界，不能手动写 Content-Type。
+  const isForm = typeof FormData !== 'undefined' && options.body instanceof FormData
+  if (options.body !== undefined && !isForm) {
     headers['Content-Type'] = 'application/json'
   }
 
@@ -114,7 +135,7 @@ export async function requestJSON<T>(path: string, options: RequestOptions = {})
     response = await fetch(`${baseUrl}${path}`, {
       method: options.method ?? 'GET',
       headers,
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      body: options.body === undefined ? undefined : isForm ? (options.body as FormData) : JSON.stringify(options.body),
       credentials: 'same-origin',
       signal: options.signal
     })
@@ -156,6 +177,11 @@ export function fetchNotes(
   return requestJSON<PagedNotes>(`/api/notes${suffix ? `?${suffix}` : ''}`, { signal })
 }
 
+/** 查询站点公开信息（页脚备案号）。 */
+export function fetchSite(signal?: AbortSignal): Promise<SiteInfo> {
+  return requestJSON<SiteInfo>('/api/site', { signal })
+}
+
 /** 查询单篇已发布笔记。 */
 export function fetchNote(slug: string, signal?: AbortSignal): Promise<Note> {
   return requestJSON<Note>(`/api/notes/${encodeURIComponent(slug)}`, { signal })
@@ -189,6 +215,13 @@ export function techStackOf(project: Project): string[] {
 /** 内容状态的展示文案。 */
 export const statusText: Record<ContentStatus, string> = {
   published: '已发布',
+  draft: '草稿',
+  hidden: '隐藏'
+}
+
+/** 项目状态的展示文案：项目讲的是「做完了没有」，不是「发没发布」。 */
+export const projectStatusText: Record<ContentStatus, string> = {
+  published: '已完成',
   draft: '草稿',
   hidden: '隐藏'
 }

@@ -17,7 +17,7 @@
 ### 1.2 范围内
 
 - 前台 5 个页面：首页、笔记列表、笔记详情、项目索引与详情、关于。
-- 后台 4 个模块：登录、笔记管理、项目管理、账号设置。
+- 后台 5 个模块：登录、笔记管理、项目管理、账号设置、站点设置。
 - 单管理员认证、内容状态管理、服务端前置校验。
 - SQLite 数据持久化、Go embed 静态资源、Docker 单容器部署。
 - 浅色/暗色主题、桌面/移动端响应式、基础可访问性。
@@ -220,6 +220,8 @@ CREATE TABLE IF NOT EXISTS project (
   summary     TEXT NOT NULL,
   tech_stack  TEXT NOT NULL DEFAULT '[]',
   repo_url    TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',   -- v2 新增：Markdown 项目说明
+  cover_image TEXT NOT NULL DEFAULT '',   -- v2 新增：封面图站内路径
   sort_order  INTEGER NOT NULL DEFAULT 0,
   status      TEXT NOT NULL DEFAULT 'draft'
               CHECK (status IN ('published', 'draft', 'hidden')),
@@ -257,6 +259,13 @@ CREATE TABLE IF NOT EXISTS admin (
   password_hash TEXT NOT NULL,
   updated_at    TEXT NOT NULL
 );
+
+-- v3 新增：站点配置，当前只存 icp_number。
+CREATE TABLE IF NOT EXISTS settings (
+  key        TEXT PRIMARY KEY,
+  value      TEXT NOT NULL DEFAULT '',
+  updated_at TEXT NOT NULL
+);
 ```
 
 约定：
@@ -266,6 +275,10 @@ CREATE TABLE IF NOT EXISTS admin (
 - `published_at` 仅在 `status=published` 时必填；转为草稿时保留原值但不展示。
 - 删除项目时笔记不删除，`project_id` 置空，前台显示为“站点记录”。
 - `note_count` 不是表字段，由 `projectColumns` 子查询统计该项目下已发布笔记数，随项目查询一并返回，供前台项目卡片展示。
+- `description` 存 Markdown 原文（上限 20 KB），`cover_image` 存站内路径（如 `/media/projects/example.svg`，空串表示无封面）；两者由 v2 迁移补列。
+- 迁移策略：`PRAGMA user_version` 记录结构版本（当前 `schemaVersion = 3`）。v2 用 `PRAGMA table_info(project)` 探测列是否存在，缺列才执行 `ALTER TABLE ... ADD COLUMN`，因此迁移中断后重跑不会因「列已存在」报错；v3 用 `CREATE TABLE IF NOT EXISTS settings` 建站点配置表；新建库先跑 v1 建表、再走 v2/v3，路径与老库一致。
+- 前台接口不返回 `description` 原文，只返回渲染净化后的 `description_html`；项目列表接口把 `description` 置空以减小响应体积，`cover_image` 照常下发供卡片展示。
+- v3 迁移用 `CREATE TABLE IF NOT EXISTS settings` 建站点配置表，新旧库同路径；`GetSetting` 对未配置的键返回空串，`SetSetting` 用 UPSERT 覆盖同键。
 
 ### 5.5 Store 接口
 
@@ -321,6 +334,9 @@ v1.2.0 实现位置：`internal/api/router.go`（`requestID`、`securityHeaders`
 | `content` | 1–100 KB | 正文不能为空且不超过 100 KB |
 | `tech_stack` | 最多 10 项，每项 1–30 字符 | 技术栈最多 10 项，单项不超过 30 个字符 |
 | `repo_url` | 必须匹配 `https://github.com/{owner}/{repo}` | 源码地址仅允许 GitHub 仓库地址 |
+| `description` | 可空，≤ 20 KB；同样过备案词扫描 | 项目说明不超过 20 KB |
+| `cover_image` | 可空，或匹配 `^/(assets|media)/.*\.(png\|jpe?g\|webp\|svg\|gif)$` 且不含 `..`、`//` | 封面图需填站内路径，如 /media/projects/example.png |
+| `icp_number` | 可空；填写时 5–100 位汉字、字母、数字或连字符 | 备案号需为 5–100 个汉字、字母、数字或连字符，例如 甘ICP备12345678号-1 |
 | `status` | `published` / `draft` / `hidden` | 内容状态不合法 |
 | `published_at` | `published` 时必填，RFC3339 | 发布状态必须填写发布时间 |
 | 管理员密码 | 至少 12 位，含字母与数字 | 新密码至少 12 位，且同时包含字母和数字 |
@@ -330,7 +346,7 @@ v1.2.0 实现位置：`internal/api/router.go`（`requestID`、`securityHeaders`
 1. **硬拦截**：售卖、下单、支付、收费、会员、广告、赞助、捐赠、破解、激活码、代购、推广等经营性词汇。
 2. **下载类拦截**：下载安装包、获取安装包、exe 下载、网盘地址、提取码等表述；允许“源码仓库”“查看源码”等合规表述。
 
-命中时返回 422，响应中包含字段名、命中词与修正建议，例如：
+扫描范围按固定顺序 `title → name → summary → content → description`，保证同一份内容每次返回同一个错误。命中时返回 422，响应中包含字段名、命中词与修正建议，例如：
 
 ```json
 {
@@ -374,8 +390,9 @@ v1.3.0 实现位置：字段规则与词汇拦截在 `internal/validate`，渲�
 |---|---|---|
 | GET | `/api/notes?project={slug}&page=1&page_size=10&q={kw}` | 已发布笔记列表，`page_size` 上限 50 |
 | GET | `/api/notes/{slug}` | 已发布笔记详情，`content` 为 Markdown 原文（Section 3 接入渲染） |
-| GET | `/api/projects` | 已发布项目列表，每项含计算字段 `note_count` |
-| GET | `/api/projects/{slug}` | 已发布项目详情 + 关联笔记 |
+| GET | `/api/projects` | 已发布项目列表，每项含计算字段 `note_count`；`description` 置空、`cover_image` 照常下发 |
+| GET | `/api/projects/{slug}` | 已发布项目详情 + 关联笔记；项目自带 `description_html`，`description` 原文置空 |
+| GET | `/api/site` | 站点公开信息：页脚备案号 `icp_number`，未配置为 `""` |
 
 管理接口：
 
@@ -384,14 +401,17 @@ v1.3.0 实现位置：字段规则与词汇拦截在 `internal/validate`，渲�
 | POST | `/api/admin/login` | 登录，设置会话 Cookie，返回 CSRF Token |
 | POST | `/api/admin/logout` | 退出，清除 Cookie |
 | GET | `/api/admin/me` | 当前管理员信息 |
-| GET | `/api/admin/notes?status=&q=&page=` | 全部状态笔记 |
+| GET | `/api/admin/notes?status=&q=&page=&page_size=` | 全部状态笔记，服务端分页（默认 20 条，上限 100） |
 | POST | `/api/admin/notes` | 新建笔记 |
 | PUT | `/api/admin/notes/{id}` | 更新笔记 |
 | DELETE | `/api/admin/notes/{id}` | 删除笔记 |
-| GET | `/api/admin/projects` | 全部状态项目 |
+| GET | `/api/admin/projects?page=&page_size=` | 全部状态项目，服务端分页（默认 20 条，上限 100） |
 | POST | `/api/admin/projects` | 新建项目 |
 | PUT | `/api/admin/projects/{id}` | 更新项目 |
 | DELETE | `/api/admin/projects/{id}` | 删除项目 |
+| GET/PUT | `/api/admin/settings` | 站点配置（备案号）；PUT 鉴权 + CSRF，空串恢复页脚占位 |
+| POST | `/api/admin/media/upload` | 封面图上传；鉴权 + CSRF，png/jpg/webp、≤2 MB，返回 `/media/uploads/…` |
+| GET | `/media/uploads/:name` | 下发运行时上传的图片；文件名白名单校验，长缓存 |
 | PUT | `/api/admin/password` | 修改密码 |
 | GET | `/api/admin/notes/{id}` | 单篇笔记（含 Markdown 原文，编辑用） |
 | POST | `/api/admin/preview` | Markdown 预览，返回净化后的 HTML |
@@ -438,13 +458,14 @@ v1.3.0 实现位置：字段规则与词汇拦截在 `internal/validate`，渲�
 - 命中真实文件直接返回；未命中且路径以 `/api/` 开头返回 404 JSON。
 - 其余路径回退到 `index.html`，由 Vue Router 接管。
 - `index.html` 设置 `Cache-Control: no-cache`；`/assets/` 下带 hash 的静态资源设置 `max-age=31536000, immutable`。
+- 运行时上传的封面图写在 `DATA_DIR/media/`，由独立路由 `/media/uploads/:name` 下发（文件名 32 位 hex + 固定扩展名，`max-age=31536000, immutable`）；与 embed 里的预置 `/media/` 文件互不覆盖。备份时要带上 media 目录。
 - 生产环境启用 gzip；如反向代理已压缩则不重复压缩。
 
 ### 5.11 日志与健康检查
 
 - 结构化 JSON 日志：`time`、`level`、`request_id`、`method`、`path`、`status`、`latency_ms`。
 - 不记录密码、Cookie、CSRF Token、完整请求体。
-- `GET /healthz` 返回 `{"status":"ok","db":"ok","version":"1.3.1"}`，数据库不可用时返回 503。
+- `GET /healthz` 返回 `{"status":"ok","db":"ok","version":"1.4.4"}`，数据库不可用时返回 503。
 
 ### 5.12 错误处理原则
 
@@ -639,12 +660,24 @@ services:
 
 发布前必须核对：
 
-1. `app/main.go` 或 `app/VERSION` 的版本号。
-2. `web/package.json` 的 `version`。
-3. 页面页脚与后台侧栏显示的版本。
+1. `app/main.go` 与 `app/VERSION` 的版本号。
+2. `web/package.json` 与 `web/package-lock.json` 的 `version`。
+3. `web/src/version.ts` 的 `APP_VERSION`（关于页、后台侧栏、登录页均从此处取）。
 4. `README.md`、`doc/*.md`、`CHANGELOG.md` 的版本。
 
-四处必须一致；升版后重新构建并打包，不能只改文档。
+五处必须一致；`scripts/build.sh` 会在编译前校验前三项，不一致直接失败。升版后重新构建并打包，不能只改文档。
+
+### 7.8 测试构建与正式构建
+
+| 脚本 | 产物用途 | 后台登录页 |
+|---|---|---|
+| `scripts/build.sh` | 正式包，可对外发布 | 账号、密码输入框留空 |
+| `scripts/build-test.sh` | 本机验收包，**禁止对外发布** | 预填测试账号与密码，打开即可登录 |
+
+- 测试凭据由 `VITE_TEST_LOGIN=1` / `VITE_TEST_USERNAME` / `VITE_TEST_PASSWORD` 在构建期注入，`AdminLoginView.vue` 只在开关为 `1` 时把它们填入输入框；账号密码可用同名环境变量覆盖。
+- 凭据不硬编码在组件里：正式构建未设置这些变量，前端产物中不含明文测试密码。
+- `scripts/build.sh` 检测未由 `build-test.sh` 标记却携带测试开关时直接退出，防止误把凭据打进正式包。
+- 验收判据：正式二进制中明文密码 `grep` 计数为 0，测试二进制为 1；测试包登录页免输入可直达 `/admin/notes`。
 
 ## 八、测试方案
 
@@ -664,11 +697,15 @@ services:
 |---|---|
 | slug 合法/非法 | 合法通过；大写、空格、下划线、中文被拒绝 |
 | repo_url 白名单 | GitHub URL 通过；其他域名、http、javascript 被拒绝 |
+| 封面图路径 | `/media/projects/*.svg` 等站内图片通过；外链、相对路径、`..` 穿越与非图片扩展名被拒绝 |
+| 封面图上传（v1.4.4） | PNG/JPG/WEBP 且内容嗅探匹配通过；SVG、改名伪装的文本、超 2 MB、未登录、缺 CSRF 被拒绝 |
+| 项目说明 | 超过 20 KB 被拒绝；说明内出现备案边界词被记为 `description` 字段拦截 |
 | 技术栈数量 | 11 项被拒绝 |
 | 硬拦截词 | “购买”“赞助”等返回 422 |
 | 下载类表述 | “下载安装包”被拒绝，“源码仓库”通过 |
 | Markdown 原始 HTML | `<script>` 被移除 |
 | Markdown 链接协议 | `javascript:` 被移除 |
+| 备案号校验 | 空串通过；`甘ICP备12345678号-1` 通过；`<script>`、超 100 位返回 422 且字段为 `icp_number` |
 | 会话签名 | 篡改 payload 后校验失败 |
 | 过期会话 | 返回 401 |
 | 密码变更 | 旧会话失效 |
@@ -689,6 +726,13 @@ services:
 | 删除项目 | 笔记保留，`project_id` 置空 |
 | 分页与筛选 | 总数、页码、项目筛选正确 |
 | 项目列表 `note_count` | 与该项目已发布笔记数一致 |
+| 后台项目列表分页（v1.4.1） | `page=1&page_size=6` 返回前 6 条且 `total` 为全量；`page=2` 返回余下条目；不传参数按默认 `page_size=20` 返回；排序按 `sort_order, id` 稳定 |
+| 后台笔记列表分页（v1.4.1） | `status`/`q` 筛选与分页叠加后 `total` 为筛选后的总数，翻页不越界 |
+| 项目说明与封面（v1.4.0） | 后台创建/更新后原样读回；`/api/projects/{slug}` 返回 `description_html` 且 `description` 为空；列表接口 `description` 为空、`cover_image` 保留；非法封面路径与说明内禁用词返回 422 |
+| v1 老库升级（v1.4.0） | 用 v1 建表语句造库并置 `user_version=1`，`Open` 后自动补 `description` / `cover_image` 两列，老数据保留、新列可写可读、重复打开不报错 |
+| 站点配置公开读取（v1.4.3） | `GET /api/site` 返回 `icp_number`；后台保存后公开接口立即读到新值；清空后为空串 |
+| 站点配置鉴权（v1.4.3） | 未登录 GET/PUT `/api/admin/settings` 返回 401；PUT 缺 CSRF 返回 403 |
+| 封面图上传（v1.4.4） | 合法 PNG 上传返回随机路径且可直接 GET 200；SVG/伪装文件/超限/未登录/缺 CSRF 被拒；非法文件名 404 |
 | 未知 `/api/*` | 404 JSON（`NOT_FOUND`） |
 | 非 `/api/` 未知路径（embedui 构建） | 回退 `index.html`，返回 200 |
 | `/assets/*` 静态文件 | 直接返回文件，`Cache-Control` 含 `immutable` |
@@ -700,11 +744,14 @@ services:
 | 首页 | 标题、最近笔记、项目索引、页脚备案位与版本署名 |
 | 笔记列表 | 筛选、搜索、空状态、移动端 |
 | 笔记详情 | 正文、关联项目、错误 slug |
-| 项目索引/详情 | 状态、技术栈、关联笔记、源码外链 |
+| 项目索引/详情 | 状态、技术栈、关联笔记、源码外链；有封面时卡片与详情页均显示封面且不裁切示意图文字；详情页说明按 Markdown 渲染、标题层级低于「项目说明」 |
 | 关于 | 非经营性声明、备案说明 |
 | 登录 | 空值、短密码、错误密码、成功跳转 |
 | 笔记管理 | 加载骨架、状态筛选、编辑、删除确认、保存错误提示 |
 | 项目管理 | 排序、状态、编辑 |
+| 后台笔记/项目列表 | 每页 6 条；翻页回顶、切筛选回第 1 页、删空自动退页；390px 只留上一页/下一页 |
+| 站点设置（v1.4.3） | 侧栏进入「站点设置」，未填显示占位；填入备案号保存后前台页脚即时更新；清空后恢复占位；非法值被拦截 |
+| 封面图上传（v1.4.4） | 后台新建/编辑项目点「选择图片上传」，路径自动填入且缩略图出现；保存后前台卡片与详情页封面正常显示，无需重新打包 |
 | 账号设置 | 密码长度、两次不一致、保存成功 |
 | 主题 | 浅色/暗色切换、刷新后保持 |
 | 响应式 | 1440px、1024px、390px 无横向溢出 |
@@ -856,6 +903,11 @@ ADMIN_PASSWORD=你的密码 MODE=update bash tools/import-notes.sh
 
 | 版本 | 日期 | 变更 |
 |---|---|---|
+| v1.4.4 | 2026-11-17 | 后台封面图支持安全上传（png/jpg/webp、≤2 MB、随机名），文件存 DATA_DIR/media 并由独立路由下发，无需重打包 |
+| v1.4.3 | 2026-11-17 | 新增 `settings` 键值表与站点配置接口；后台「站点设置」维护 ICP 备案号，前台页脚按配置展示，空值保留占位 |
+| v1.4.2 | 2026-11-17 | 新增测试构建脚本 `scripts/build-test.sh`，登录框仅在测试包预填凭据；正式构建加开关防误用校验 |
+| v1.4.1 | 2026-11-17 | 后台笔记/项目列表接入 6 条/页服务端分页，抽出 `Pager.vue` 供三处列表复用；项目列表接口新增 `page`/`page_size` 与总数返回 |
+| v1.4.0 | 2026-11-17 | 项目新增 `description`（Markdown 说明）与 `cover_image`（封面图）两字段：v2 迁移按列存在性补列，后台可编辑并预览，前台卡片显示封面、详情页渲染说明 HTML |
 | v1.3.5 | 2026-11-17 | 新增 excelMailmerge 项目与 4 篇复盘；§12.3 新增写作约定「同批文章不共用同一骨架」 |
 | v1.3.4 | 2026-11-17 | 录入 SiteGuard 的 4 篇技术复盘；正文首次引用 `/media/siteguard-origin.svg`，配图通道端到端验证 |
 | v1.3.3 | 2026-11-17 | 录入 LanFileShare 的 4 篇技术复盘；`repo_url` 与 `tech_stack` 纠正为真实值（`https://github.com/mylxnet/*`） |

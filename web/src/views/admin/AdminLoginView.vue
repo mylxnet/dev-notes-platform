@@ -3,12 +3,15 @@ import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { login } from '../../admin'
 import { ApiError } from '../../api'
+import { VERSION_LINE } from '../../version'
 
 const router = useRouter()
 const route = useRoute()
 
-const username = ref('')
-const password = ref('')
+// 仅在 VITE_TEST_LOGIN=1 打出的测试包里预填；正式构建的产物不含任何测试凭据。
+const isTestBuild = import.meta.env.VITE_TEST_LOGIN === '1'
+const username = ref(isTestBuild ? import.meta.env.VITE_TEST_USERNAME || '' : '')
+const password = ref(isTestBuild ? import.meta.env.VITE_TEST_PASSWORD || '' : '')
 const error = ref('')
 const submitting = ref(false)
 
@@ -41,7 +44,7 @@ async function submit() {
         <h1>只属于一个人的<br />内容管理入口</h1>
         <p>没有注册、没有评论、没有投稿。这里只维护笔记与项目两类内容，保存前会拦截不符合备案边界的表述。</p>
       </div>
-      <div>v1.3.9 by Mr lin</div>
+      <div>{{ VERSION_LINE }}</div>
     </section>
     <section class="login-panel">
       <div class="login-card">

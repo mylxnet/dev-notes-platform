@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import EmptyState from '../components/EmptyState.vue'
-import { errorMessageOf, fetchProjects, techStackOf, type Project } from '../api'
+import { errorMessageOf, fetchProjects, projectStatusText, techStackOf, type Project } from '../api'
 
 const projects = ref<Project[]>([])
 const loading = ref(true)
@@ -29,13 +29,8 @@ onMounted(load)
     <div class="section-head">
       <div>
         <h1 class="section-title">项目索引</h1>
-        <div class="section-subtitle">个人练习作品记录 · 仅提供源码外链</div>
+        <div class="section-subtitle">个人练习作品，共 {{ projects.length }} 个</div>
       </div>
-      <span class="section-subtitle">已公开 {{ projects.length }} 个</span>
-    </div>
-
-    <div class="callout">
-      本站不托管安装包或可执行文件。受许可证约束，项目入口仅链接到 GitHub 源码仓库。
     </div>
 
     <div v-if="error" class="error-banner" role="alert">
@@ -52,9 +47,18 @@ onMounted(load)
     </div>
     <div v-else-if="projects.length" class="project-grid">
       <RouterLink v-for="project in projects" :key="project.id" :to="`/projects/${project.slug}`" class="project-card">
+        <img
+          v-if="project.cover_image"
+          class="project-cover"
+          :src="project.cover_image"
+          :alt="`${project.name} 封面`"
+          loading="lazy"
+        />
         <div class="project-top">
           <span class="project-name">{{ project.name }}</span>
-          <span class="status status-published">已发布</span>
+          <span class="status" :class="`status-${project.status}`">
+            {{ projectStatusText[project.status] }}
+          </span>
         </div>
         <p class="project-summary">{{ project.summary }}</p>
         <div class="tech-list">
