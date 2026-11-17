@@ -6,6 +6,10 @@
 
 | 版本 | 日期 | 摘要 |
 |---|---|---|
+| v1.3.9 | 2026-11-17 | 新增台账汇总器项目与 3 篇复盘（单元格选择模式、索引器绑定排序、交付前脱敏） |
+| v1.3.8 | 2026-11-17 | 新增 QuickOcr 项目与 1 篇「免费开源 OCR」成本账文章 |
+| v1.3.7 | 2026-11-17 | 新增 MailHub 项目与 3 篇复盘（收件箱标记、UID 区间陷阱、可见性口径） |
+| v1.3.6 | 2026-11-17 | 新增记账管理平台项目与 8 篇复盘（不可变账本、联动校验、收益口径、备份时区、静态缓存、移动端 PDF、401 分流、坏账核销） |
 | v1.3.5 | 2026-11-17 | 新增 excelMailmerge 项目与 4 篇复盘；确立「同批文章不套同一骨架」的写作约定 |
 | v1.3.4 | 2026-11-17 | 录入 SiteGuard 的 4 篇技术复盘，其中一篇启用 `/media/` 插图 |
 | v1.3.3 | 2026-11-17 | 录入 LanFileShare 的 4 篇技术复盘，三个项目卡片的仓库地址与技术栈改为真实值 |
@@ -20,6 +24,73 @@
 | v1.0.0 | 2026-11-17 | 初始设计方案 |
 
 ## 详细更新日志（按版本倒序）
+
+### v1.3.9 · 2026-11-17
+
+**新增**
+
+- 新增第 8 个项目 `exceltohub`（台账汇总器 / LedgerHub，C# / .NET 8 / WPF / ClosedXML），源码外链 `https://github.com/mylxnet/ExcelToHub`。仓库未声明许可证，本站只放外链。
+- 新增 3 篇文章，素材取自该仓库 `README.md`、`doc/PROJECT_STATE.md` 的踩坑 1~5 与 v1.1.6 脱敏记录：
+  - `wpf-cell-selection-kills-row-apis`（`SelectionUnit="Cell"` 之后，删行删不掉、右键未选中行崩溃、点同一格不取源，三个症状一个前提；附 UI 自动化测 WPF 右键菜单的四个必要条件）
+  - `datatable-indexer-binding-sort-crash`（`{Binding [列名]}` 索引器绑定 + 点表头 = `ArgumentException`，从异常文本反推到 `SortDescription` 机制）
+  - `desensitize-proof-by-unzip`（脱敏验收物不是 diff 而是产物：解包 `xl/sharedStrings.xml` 双向核对，`test/` 目录移出仓库的遗留问题）
+
+**调整**
+
+- 3 篇分别采用「一个前提三处塌方」「异常文本反推」「证据链式验收」三种骨架，与既有 28 篇不重复。
+- 版本统一升至 `v1.3.9`：`app/VERSION`、`app/main.go`、`web/package.json`/lock、页脚、后台侧栏与登录页、文档同步。
+
+**修复**
+
+- 无代码改动。
+
+### v1.3.8 · 2026-11-17
+
+**新增**
+
+- 新增第 7 个项目 `quickocr`（QuickOcr，C# / .NET 8 / WPF / Tesseract 5，MIT），源码外链 `https://github.com/mylxnet/QuickOcr`。
+- 新增 1 篇文章 `free-ocr-ledger`（免费的 OCR 能用：钱省下来了，代价挪到了别处）：以「记账」骨架拆解免费开源的四个来源（代码 MIT / 引擎 Apache 2.0 / 语言包 tessdata_fast / self-contained 运行时）与四项支出（226 MB 体积、Tesseract 精度天花板、首次联网拉语言包、无测试无 doc 的维护面），并给出「三段许可是否干净 / 失败有没有出口 / 边界有没有写进文档」三条判断标准。
+
+**调整**
+
+- 版本统一升至 `v1.3.8`：`app/VERSION`、`app/main.go`、`web/package.json`/lock、页脚、后台侧栏与登录页、文档同步。
+
+**修复**
+
+- 无代码改动。
+
+### v1.3.7 · 2026-11-17
+
+**新增**
+
+- 新增第 6 个项目 `mailhub`（MailHub，NestJS / React / TypeScript / SQLite / Prisma）：自托管多账号邮件客户端，增量同步与后台定时收取。该仓库本地存在但 GitHub 未公开，项目卡不挂外链，页面按「源码入口暂未提供」渲染。
+- 新增 3 篇文章，素材取自该仓库 `doc/` 的方案与踩坑记录：`imap-inbox-flag-not-standard`（`\Inbox` 不在 IMAP 标准属性里，后台轮询只扫到「已发送」）、`imap-uid-range-star-trap`（`uidNext:*` 的 `*` 是最大 UID，守卫差一格导致每轮误报新邮件）、`visibility-scope-single-source`（「什么算收件」的口径在列表、计数、清理三处各写一份，含 Prisma `contains` 走 LIKE 的真库对照）。
+
+**调整**
+
+- 3 篇沿用「同批文章不套同一骨架」的约定，分别写成「排查时间线」「单行代码解剖」「真库谓词对照」三种结构，均不含表格堆砌式的小结。
+- 版本统一升至 `v1.3.7`：`app/VERSION`、`app/main.go`、`web/package.json`/lock、页脚、后台侧栏与登录页、文档同步。
+- 开发库重建：上一轮的临时库位于 WSL `/tmp/dn-dev`，随环境重启丢失；本轮按 `content/notes/` 全量重导（6 个项目 + 27 篇），早期 3 篇占位笔记不再重建。
+
+**修复**
+
+- 无代码改动。
+
+### v1.3.6 · 2026-11-17
+
+**新增**
+
+- 新增第 5 个项目 `jitijingjiguanli`（记账管理平台，Go / SQLite / Vue 3 / Vant），源码外链 `https://github.com/mylxnet/jitijingjiguanli`。
+- 新增 8 篇文章：`immutable-ledger-void-only`（流水只能作废）、`linkage-rules-verification`（联动规则逐条核对抓出 6 个 bug）、`reinvest-income-pollutes-principal`（再投资收益污染本金，三种口径划分）、`vacuum-into-backup-and-timezone`（VACUUM INTO 快照 + 时区导致备份晚 8 小时）、`stale-chunk-html-as-js`（旧 chunk 回退成 HTML，200 但 MIME 拒绝）、`mobile-pdf-preview-pdfjs`（iframe 塞 PDF 移动端白屏 → pdf.js + rAF 坑）、`401-on-public-auth-paths`（公开认证接口的 401 被当成会话失效）、`bad-debt-writeoff-design`（坏账核销：只清应收不动账）。
+
+**修复**
+
+- 第 8 篇初版因正文出现「下载链接」被服务端备案词校验拦截（`HTTP 422`），改写为「下载按钮的 href」后通过；导入工具如实回显了服务端错误信息，未静默失败。
+
+**调整**
+
+- 8 篇结构各不相同：决策对比、核对清单、取证推演、SQL 方案、链路取证、能力矩阵、问题清单、约束推导。
+- 版本统一升至 `v1.3.6`：`app/VERSION`、`app/main.go`、`web/package.json`/lock、页脚、后台侧栏与登录页、文档同步。
 
 ### v1.3.5 · 2026-11-17
 

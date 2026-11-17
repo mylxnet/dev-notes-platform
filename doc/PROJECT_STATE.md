@@ -1,12 +1,79 @@
 # 项目状态 · 我的开发笔记
 
-> v1.3.5 · by Mr lin · 2026-11-17
+> v1.3.9 · by Mr lin · 2026-11-17
 
 ## 当前版本
 
-v1.3.5 · Section 3 已完成，Section 4 进行中：4 个项目（SiteGuard / SuperClip-C / LanFileShare / excelMailmerge）共 19 篇，其中 16 篇为真实复盘，3 篇仍是早期占位。下一阶段：清理占位笔记，进入 Section 5 部署。
+v1.3.9 · Section 3 已完成，Section 4 进行中：8 个项目共 31 篇，全部为真实技术复盘（早期 3 篇占位笔记已不再重建）。下一阶段：Section 5 部署。
 
-## 本轮改动记录（v1.3.5，2026-11-17）
+## 本轮改动记录（v1.3.9，2026-11-17）
+
+- 新增项目 `exceltohub`（台账汇总器 / LedgerHub，id=8）：`C# / .NET 8 / WPF / ClosedXML`，源码外链 `https://github.com/mylxnet/ExcelToHub`；该仓库未声明许可证，站点只放外链，不做分发说明。
+- 新增 3 篇，素材取自 `README.md` 与 `doc/PROJECT_STATE.md`（踩坑 1~5、v1.1.6 脱敏记录、38 项冒烟 / 13 项 UI 回归）：
+  - `wpf-cell-selection-kills-row-apis` —— `SelectionUnit="Cell"` 视作一次 API 变更：`SelectedItem` 恒空、`IsSelected` 赋值抛异常、`SelectedCellsChanged` 同一格不重抛。
+  - `datatable-indexer-binding-sort-crash` —— 索引器绑定 `{Binding [列名]}` 被排序当成属性名，异常文本反推到 `SortDescription`。
+  - `desensitize-proof-by-unzip` —— 脱敏验收靠解包 `xl/sharedStrings.xml` 双向核对，并明确「移出仓库 ≠ 历史清除」这一遗留。
+- 骨架分别为「一个前提三处塌方」「异常文本反推」「证据链式验收」，延续 §12.3 约定。
+
+### 验收证据（v1.3.9，2026-11-17）
+
+- 项目创建：`POST /api/admin/projects` 返回 `201 id=8`。
+- 导入：`创建 3，更新 0，跳过 28，失败 0`。
+- 站点统计：笔记 31 篇；`/api/projects/exceltohub` 返回技术栈 `C#/.NET 8/WPF/ClosedXML`、`note_count=3`。
+- 正文渲染结构（`content_html` 统计）：`wpf-cell-selection-kills-row-apis` h2=7/table=2/li=4/pre=7；`datatable-indexer-binding-sort-crash` 8/2/0/4；`desensitize-proof-by-unzip` 6/3/0/2。
+- 备案词自检：全文扫描 `hardWords` 与 `downloadPhrases`，命中 0。
+
+## 历史改动记录（v1.3.8，2026-11-17）
+
+- 新增项目 `quickocr`（QuickOcr，id=7）：`C# / .NET 8 / WPF / Tesseract 5`，MIT，源码外链 `https://github.com/mylxnet/QuickOcr`。
+- 新增 1 篇 `free-ocr-ledger`（免费的 OCR 能用：钱省下来了，代价挪到了别处），素材取自该仓库 `README.md` 与文件树（无 `doc/` 目录，文档全在 README）。
+- 骨架为「记账」：收入栏记四项许可（代码 MIT / Tesseract Apache 2.0 / 语言包 tessdata_fast / self-contained 运行时），支出栏记体积 226 MB、精度天花板、首次联网拉语言包、无测试无 doc 的维护面，末尾给三条判断标准。
+
+### 验收证据（v1.3.8，2026-11-17）
+
+- 项目创建：`POST /api/admin/projects` 返回 `201 id=7`。
+- 导入：`创建 1，更新 0，跳过 27，失败 0`。
+- 站点统计：笔记 28 篇；`quickocr` 关联 1 篇（`free-ocr-ledger`），`/api/projects/quickocr` 技术栈返回 `C#/.NET 8/WPF/Tesseract 5`、仓库为真实地址。
+- 备案词自检：全文扫描 `hardWords` 与 `downloadPhrases`，命中 0（文中「语言包」「发行包」等表述均未触表）。
+
+## 历史改动记录（v1.3.7，2026-11-17）
+
+- 新增项目 `mailhub`（MailHub，id=6）：`NestJS / React / TypeScript / SQLite / Prisma`，自托管多账号邮件客户端。源码仓库只在本地（`E:\traework\mailhub`），GitHub 未公开，因此 `repo_url` 留空，项目页显示「源码入口暂未提供」。
+- 新增 3 篇，素材取自该仓库 `doc/SYNC_POLLING.md`、`doc/SPAM_RULES.md` 与 `PROJECT_STATE.md` §3.23~§3.30：
+  - `imap-inbox-flag-not-standard` —— `\Inbox` 不是 IMAP 标准属性（IANA 标注 JMAP only），后台轮询只筛到「已发送」，收件箱从未被打开。
+  - `imap-uid-range-star-trap` —— `uidNext:*` 的 `*` 是邮箱最大 UID 且区间无序，守卫 `>` 差一格，每轮把最新那封旧信计成新增。
+  - `visibility-scope-single-source` —— 「什么算收件」在列表、计数、清理三处各写一份，附 Prisma `contains` 走 LIKE 的真库对照与 `every` 空关系恒真两个坑。
+- 3 篇分别采用「排查时间线」「单行代码解剖」「真库谓词对照」三种骨架，延续 §12.3 的写作约定。
+
+### 验收证据（v1.3.7，2026-11-17）
+
+- 开发库重建：上一轮 `/tmp/dn-dev` 已随 WSL 重启丢失，本轮新建 `DATA_DIR=/tmp/dn-dev` 并全量重导，`/healthz` 返回 `1.3.6`（重建时二进制尚为旧版，升版后重新构建并复测为 `1.3.7`）。
+- 项目创建：`POST /api/admin/projects` 依次返回 `id=1..6`，`mailhub` 为 `id=6`；`repo_url` 传空串通过校验（校验仅要求非空时必须是 GitHub 仓库地址）。
+- 导入：`创建 27，更新 0，跳过 0，失败 0`。
+- 站点统计：笔记 27 篇；`siteguard 4 / superclip 4 / lanfileshare 4 / excelmailmerge 4 / jitijingjiguanli 8 / mailhub 3`（早期 3 篇占位笔记未重建，故前三项各少 1 篇）。
+- 浏览器（Edge/Chromium 1280px，`http://172.25.209.179:18090`）：
+  - `imap-inbox-flag-not-standard`：`h1` 正确，`h2=8 / table=2 / li=9 / pre=3`；
+  - `imap-uid-range-star-trap`：`h2=7 / table=1 / li=9 / pre=4`；
+  - `visibility-scope-single-source`：`h2=7 / table=1 / li=2 / pre=7`；
+  - 三页 `scrollWidth == clientWidth == 1280`，无横向滚动条。
+  - `/projects/mailhub`：技术栈渲染为 `NestJS / React / TypeScript / SQLite / Prisma`，外链数为 0，显示「源码入口暂未提供」。
+- 备案词自检：三篇全文扫描 `hardWords` 与 `downloadPhrases`，命中 0；正文里「营销订阅文件夹」等表述均避开了词表。
+
+## 历史改动记录（v1.3.6，2026-11-17）
+
+- 新增项目 `jitijingjiguanli`（记账管理平台，id=5）：`Go/SQLite/Vue 3/Vant`，源码外链 `mylxnet/jitijingjiguanli`。
+- 新增 8 篇，素材来自该仓库 `docs/` 下的联动规则、校验摘要、坏账核销、备份、认证修复、静态资源、投资收益口径等方案文档。
+- 8 篇分别采用决策对比、核对清单、取证推演、SQL 方案、链路取证、能力矩阵、问题清单、约束推导八种结构（延续 §12.3 的约定）。
+
+### 验收证据（v1.3.6，2026-11-17）
+
+- 项目创建：`id=5 slug=jitijingjiguanli`。
+- 导入首轮：`创建 7，更新 0，跳过 16，失败 1` —— 失败项为 `mobile-pdf-preview-pdfjs`，`HTTP 422 内容包含不符合备案边界的表述`，定位到正文含「下载链接」被拦截。
+- 改写为「下载按钮的 href」后复跑：`创建 1，更新 0，跳过 23，失败 0`。
+- 站点统计：笔记 27 篇；`siteguard 5 / superclip 5 / lanfileshare 5 / excelmailmerge 4 / jitijingjiguanli 8`。
+- 浏览器（Chromium 1280px）：项目页技术栈 `['Go','SQLite','Vue 3','Vant']`、外链为真实仓库；8 篇详情页结构各异——`h2` 数量 6/6/8/7/7/7/6/5，表格 1/2/3/2/1/2/3/3，列表 2/1/1/2/2/3/1/1。
+
+## 历史改动记录（v1.3.5，2026-11-17）
 
 - 新增项目 `excelMailmerge`（id=4）：`C#/.NET 8/WPF/ClosedXML`，源码外链 `mylxnet/excelMailmerge`。
 - 新增 4 篇：`wpf-invariant-globalization-crash`、`excel-row-probe-infinite-loop`、`wpf-progress-binding-and-ui-thread`、`single-instance-mutex-after-kill`。
@@ -199,7 +266,8 @@ v1.3.5 · Section 3 已完成，Section 4 进行中：4 个项目（SiteGuard / 
 
 ## 已知限制
 
-- mailhub 仓库地址返回 404，GitHub 搜索无匹配，暂不纳入展示
+- mailhub 源码只在本地 `E:\traework\mailhub`，GitHub 未公开（`api.github.com/repos/mylxnet/mailhub` 返回 404），项目卡外链留空，页面显示「源码入口暂未提供」
+- 开发库放在 `/tmp/dn-dev`，重启即丢；重建靠 `content/notes/` + 管理 API 全量重导，项目行（名称、摘要、技术栈）只存在于库中，重建时需手工补录
 - SuperClip-C、LanFileShare 的许可证限制分发，站点只能放源码外链
 - 前台无评论、无访问统计（方案 A 范围外）
 - 第二版原型仅归档，不参与正式构建；是否删除待确认
@@ -230,19 +298,21 @@ v1.3.5 · Section 3 已完成，Section 4 进行中：4 个项目（SiteGuard / 
 | 正文里 `/media/xxx.svg` 的图片被净化后 `src` 清空 | 图片白名单仍是 `^/assets/`，`/media/` 不在允许目录内 | 白名单放宽为 `^/(?:assets|media)/`，测试补 `/media/` 正例 | 新增资源目录时要同步检查净化白名单与静态下发两处，只加文件不改白名单等于没生效 |
 | 正文 SVG 插图在窄容器下被压扁变形 | SVG 自带 `width`/`height` 属性，CSS 只写 `max-width: 100%` 不会让高度自适应 | 补 `display: block` 与 `height: auto` | 替换元素（img/svg）缩放宽度的同时必须显式放开高度，否则比例丢失 |
 | 页脚「v1.3.0 by Mr lin」被右下角主题按钮压住 | 主题按钮 `position: fixed`，页脚没有为它预留空间 | 页脚右内边距留 132px，≤600px 改为底部留白 76px | 固定定位元素会覆盖正常流内容，页脚类区域必须预留避让空间 |
+| 文章导入失败但看不出原因（HTTP 422） | 正文含备案词表中的短语（本次是「下载链接」），校验在服务端拦截 | 改写为「下载按钮的 href」；导入工具已回显服务端 message，先看它再改正文 | 写作前先扫一遍禁词：售卖/下单/支付/收费/会员/广告/赞助/捐赠/破解/激活码/代购/推广，以及「下载安装包/下载地址/下载链接/网盘地址/提取码」等短语 |
 | 主仓库 `app/`、`doc/`、`tools/`、`scripts/` 突然"消失"，但 `git status` 不报删除 | 误在本仓库执行了 `git sparse-checkout set --no-cone '/*.md'`（本想对 `.tmp_lfs` 克隆执行，`cd` 失败后落到了父仓库），149 个文件被标 `skip-worktree`，工作区只剩根目录 md | `git sparse-checkout disable` 恢复；核验 `Test-Path` 与 `git ls-tree -r HEAD` 文件数（152）一致 | 在仓库内做临时克隆/实验前先确认当前目录；`skip-worktree` 会让缺文件看起来"没改过"，排查时先查 `git ls-files -v` 的 S 标记 |
 | 用内网 IP 以 http 访问后台，登录后立刻被踢回登录页、无法新增或修改 | `COOKIE_SECURE` 默认 `true`，Cookie 带 `Secure`，HTTP 下被浏览器丢弃 → `/api/admin/me` 401 | `COOKIE_SECURE` 改为三档，默认 `auto` 按请求协议判断（含 `X-Forwarded-Proto`） | Secure Cookie 只在 HTTPS 与 localhost 生效，本机测试通过不代表换地址可用；会话类问题先看 Cookie 是否落盘 |
 | `TestParseRejectsTamperedSession` 时好时坏 | 用例改写 base64url 末位字符，末位含未使用位，解码后字节可能完全相同，篡改等于没改 | 改为改写签名段首字符，保证解码字节必变 | 校验签名的用例不能靠「改一个字符」想当然，要确认改动真的改变了字节 |
 
 ## 待办清单
 
-1. 确认 mailhub 正确仓库地址，或决定移除
-2. 确认 6 个项目的真实 GitHub 地址与许可证状态
-3. 三篇早期占位笔记仍在前台，与实际实现不符，需逐篇替换或转草稿：`lan-discovery`（讲 UDP 广播 + Go，实际是 C# 扫码上传）、`sqlite-pure-go-driver`（讲 Go/CGo，项目其实是 Node.js）、`clipboard-history-design`（原型期设想，未对照 C++ 实现核对）
-4. `mailhub-imap-cursor.svg` 仍未在任何文章中被引用（`siteguard-origin.svg` 已随 `reverse-proxy-origin-403` 上线）
+1. ~~确认 mailhub 正确仓库地址，或决定移除~~ —— 已确认：源码在本地 `E:\traework\mailhub`，GitHub 未公开，项目卡外链留空
+2. 确认 8 个项目的真实 GitHub 地址与许可证状态（7 个已有真实地址；mailhub 无公开仓库；ExcelToHub 无 LICENSE 文件，QuickOcr 的 README 声明 MIT 但仓库无 LICENSE 文件——两者都只放外链，站点不做分发）
+3. ~~三篇早期占位笔记~~ —— 开发库重建后已不存在（`lan-discovery` / `sqlite-pure-go-driver` / `clipboard-history-design` 不再入库）
+4. `mailhub-imap-cursor.svg` 仍未在任何文章中被引用（`siteguard-origin.svg` 已随 `reverse-proxy-origin-403` 上线）；本轮 3 篇纯文字，没有插图
 5. `tools/import-notes.sh` 目前只处理新建与更新，未做正文配图上传（插图仍走 `web/public/media/`）
-6. Section 5：Docker + 1Panel 部署 + 浏览器验收
-7. 每个 Section 完成后升小版本、同步文档并提交
+6. 项目元数据（名称/摘要/技术栈）只存在于数据库，重建开发库要手工补录；考虑加一份 `content/projects.json` + 入库脚本，避免下次重来
+7. Section 5：Docker + 1Panel 部署 + 浏览器验收
+8. 每个 Section 完成后升小版本、同步文档并提交
 
 ## 版本一致性检查
 
@@ -250,10 +320,10 @@ v1.3.5 · Section 3 已完成，Section 4 进行中：4 个项目（SiteGuard / 
 
 | 位置 | 当前值 |
 |---|---|
-| `app/VERSION` / `app/main.go` | `1.3.5` |
-| `web/package.json` / `web/package-lock.json` | `1.3.5` |
-| `web/src/components/SiteFooter.vue` / 后台侧栏 / 登录页 | `v1.3.5 by Mr lin` |
-| `doc/*.md` / `README.md` / `CHANGELOG.md` | `v1.3.5` |
+| `app/VERSION` / `app/main.go` | `1.3.9` |
+| `web/package.json` / `web/package-lock.json` | `1.3.9` |
+| `web/src/components/SiteFooter.vue` / 后台侧栏 / 登录页 | `v1.3.9 by Mr lin` |
+| `doc/*.md` / `README.md` / `CHANGELOG.md` | `v1.3.9` |
 
 `scripts/build.sh` 在编译前校验 `app/main.go` 的 `var version` 与 `app/VERSION` 一致，不一致直接失败。原型工程 `prototype/` 仍为 `v1.0.3`，作为冻结基线不再跟随版本。
 
