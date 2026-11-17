@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
-import { createNote, getNote, listProjects, previewMarkdown, updateNote, type NoteInput } from '../../admin'
+import { createNote, getNote, listProjects, updateNote, type NoteInput } from '../../admin'
+import MarkdownEditor from '../../components/MarkdownEditor.vue'
 import {
   ApiError,
   errorMessageOf,
@@ -35,10 +36,6 @@ const form = ref({
   status: 'draft' as ContentStatus,
   published_at: ''
 })
-
-const showPreview = ref(false)
-const previewHtml = ref('')
-const previewLoading = ref(false)
 
 const statuses: ContentStatus[] = ['published', 'draft', 'hidden']
 
@@ -109,23 +106,6 @@ async function save() {
   }
 }
 
-async function togglePreview() {
-  if (showPreview.value) {
-    showPreview.value = false
-    return
-  }
-  previewLoading.value = true
-  error.value = ''
-  try {
-    previewHtml.value = await previewMarkdown(form.value.content)
-    showPreview.value = true
-  } catch (err) {
-    error.value = errorMessageOf(err)
-  } finally {
-    previewLoading.value = false
-  }
-}
-
 watch(
   form,
   () => {
@@ -178,9 +158,6 @@ onBeforeRouteLeave(() => {
       </div>
       <div class="row-actions">
         <RouterLink to="/admin/notes" class="btn">返回列表</RouterLink>
-        <button class="btn" type="button" :disabled="previewLoading || saving" @click="togglePreview">
-          {{ previewLoading ? '渲染中…' : showPreview ? '关闭预览' : '预览' }}
-        </button>
         <button class="btn btn-primary" type="button" :disabled="saving || loading" @click="save">
           {{ saving ? '保存中…' : '保存' }}
         </button>
@@ -235,14 +212,9 @@ onBeforeRouteLeave(() => {
         </label>
       </div>
 
-      <label>
-        正文（Markdown）
-        <textarea v-model="form.content" class="editor-textarea" placeholder="支持标题、列表、代码块、表格；不允许原始 HTML 与外链图片" />
-      </label>
-
-      <div v-if="showPreview">
-        <div class="section-subtitle">预览（服务端渲染并净化）</div>
-        <div class="article-markdown preview-panel" v-html="previewHtml" />
+      <div class="field-block">
+        <div class="field-head"><span>正文（Markdown）</span><span>工具栏插入语法，右侧实时预览；图片走站内上传</span></div>
+        <MarkdownEditor v-model="form.content" :disabled="saving" :min-height="380" />
       </div>
 
       <div class="row-actions">

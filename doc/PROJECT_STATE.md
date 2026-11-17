@@ -1,14 +1,34 @@
 # 项目状态 · 我的开发笔记
 
-> v1.4.4 · by Mr lin · 2026-11-17
+> v1.4.5 · by Mr lin · 2026-11-17
 
 ## 当前版本
 
-v1.4.4 · Section 3 已完成，Section 4 进行中：8 个项目共 31 篇，全部为真实技术复盘（早期 3 篇占位笔记已不再重建）。数据库结构版本 `schemaVersion = 3`（新增 `settings` 表）。下一阶段：Section 5 部署。
+v1.4.5 · Section 3 已完成，Section 4 进行中：8 个项目共 31 篇，全部为真实技术复盘（早期 3 篇占位笔记已不再重建）。数据库结构版本 `schemaVersion = 3`（新增 `settings` 表）。下一阶段：Section 5 部署。
 
 **当前 `app/build/dev-notes` 是测试包**：登录页预填测试账号密码，仅用于本机验收；对外发布必须重新执行 `bash scripts/build.sh`。服务当前挂载真实库 `/tmp/dn-dev/notes.db`，上传图片落在 `/tmp/dn-dev/media/`。
 
-## 本轮改动记录（v1.4.4，2026-11-17）
+## 本轮改动记录（v1.4.5，2026-11-17）
+
+- 新增 `web/src/components/MarkdownEditor.vue`，12 个工具栏按钮、Markdown 原文输入、实时分栏预览、三种视图模式与图片上传；接入 `AdminNoteEditView.vue` 正文与 `AdminProjectEditView.vue` 项目说明。
+- 预览走服务端 `POST /api/admin/preview`，400ms 防抖 + 请求序号只应用最新响应；上传走 `POST /api/admin/media/upload`，成功后插入 `![alt](/media/uploads/…)` 并选中 alt。
+- 移除两个编辑页原有的「预览 / 预览说明」按钮与独立预览区，避免重复入口。
+- 新增界面原型 `prototype/md-editor.html`（可直接在浏览器打开），先确认工具栏、上传与分栏交互再写真实代码。
+- 窄屏（≤640px）`.editor-row` 改单列、表单控件 `min-width: 0`，修掉日期控件造成的 34px 横向溢出。
+- 版本升至 `v1.4.5`（5 处版本字段 + 文档）。
+
+### 验收证据（v1.4.5，2026-11-17）
+
+- 原型浏览器验收：图片按钮选文件 → 上传中状态 → 插入语法并预览，`alt` 文字自动选中，控制台 0 错误。
+- `gofmt -l .` 无输出；`go vet ./...` 无输出；`go test ./... -count=1` 全部 ok；`bash scripts/build-test.sh` 版本校验与构建通过，`/healthz` 返回 `1.4.5`。
+- 浏览器验收（Playwright，真实库 `/tmp/dn-dev`，只上传测试图、未保存任何笔记/项目）：
+  - 工具栏 12 个按钮；1280px 分栏为 `439px + 439px`；点「粗体」把 `这是正文` 变成 `**这是正文**`；
+  - 输入 `## 验收标题` 后右侧 400ms 内出现 `<h2>验收标题</h2>` 与 `<strong>这是正文</strong>`；
+  - 上传测试 PNG → 插入 `/media/uploads/d685…png`、预览图片 1 张、按钮从「上传中…」恢复为「图片」；
+  - 「仅编辑」隐藏预览、「仅预览」隐藏输入框；项目说明页编辑器 1 个、原文长度 265 正常回填；
+  - 390px 分栏变为单列 `352px`、横向溢出 **0**（修复前为 34）；控制台错误 0 条。
+
+## 历史改动记录（v1.4.4，2026-11-17）
 
 - 后台项目编辑页封面框新增「选择图片上传」按钮：前端先校验扩展名（png/jpg/jpeg/webp）与大小（≤2 MB），上传成功自动填入 `/media/uploads/…`，封面缩略图即时刷新。
 - 新增 `api/internal/api/media.go`：`POST /api/admin/media/upload`（鉴权 + CSRF）做扩展名白名单、`http.DetectContentType` 内容嗅探、2 MB 上限、crypto/rand 随机文件名，写 `.part` 后原子改名到 `DATA_DIR/media`；`GET /media/uploads/:name` 严格名校验后下发，长缓存。
@@ -467,6 +487,7 @@ v1.4.4 · Section 3 已完成，Section 4 进行中：8 个项目共 31 篇，�
 | D26 | 测试凭据走构建变量 + 独立测试构建脚本，不硬编码进组件 | 登录页是公开页面，硬编码凭据会随正式产物泄露；用 `VITE_TEST_LOGIN=1` 开关把测试便利限制在验收包内，`build.sh` 再加防误用校验。代价是测试包与正式包是两份产物，必须明确区分用途 |
 | D27 | 站点配置用 `settings` 键值表，不往 `admin` 表加列 | 备案号是站点属性而非管理员属性；键值表后续加配置项无需迁移表结构。代价是 `schemaVersion` 升到 3，前台多一次极轻量的公开查询（整站只拉一次） |
 | D28 | 封面图支持上传，但只收 png/jpg/webp、禁 SVG，文件存 `DATA_DIR/media` | 解决「换图要重打包」痛点，同时把文件写入面压到最小：扩展名 + 内容嗅探双校验、随机名防穿越、2 MB 上限；SVG 可内嵌脚本故不支持。代价是备份要带上 media 目录 |
+| D29 | Markdown 编辑器自建组件，预览仍走服务端接口 | 依赖从简（不引第三方编辑器），正文原文与既有渲染/净化管线完全一致；用防抖与请求序号解决实时预览的接口压力与竞态。代价是工具栏交互代码要自己维护 |
 
 ## 已知限制
 
@@ -515,6 +536,14 @@ v1.4.4 · Section 3 已完成，Section 4 进行中：8 个项目共 31 篇，�
 | 想让登录框预填密码，但直接把密码写进 Vue 组件会随正式包一起发布 | 登录页是公开静态资源，任何访客都能从页面/源码读到管理员密码 | 凭据改为构建变量注入，只有 `scripts/build-test.sh` 打出的包预填；正式包 `grep` 计数为 0，并在 `build.sh` 加开关防误用 | 涉及凭据的「测试便利」必须按产物隔离，不能只靠记得改回来 |
 | 切换测试包后用户反馈「笔记和项目找不到了」 | 启动登录验收服务时给了新空库 `DATA_DIR=/tmp/dn-login` 并 `pkill` 掉原服务，用户看到的是空站；真实开发库是 `/tmp/dn-dev/notes.db`（8 项目 / 31 笔记），数据从未丢失 | 先用只读 sqlite 核对两个库的行数确认根因；备份真实库后用 `DATA_DIR=/tmp/dn-dev` 重启，前台恢复 30 篇已发布 + 8 个项目 | 启动服务前必须确认 `DATA_DIR` 指向哪份数据；杀旧服务前先记下它挂载的库，不能随便换新目录充测试 |
 | 切回真实库后，测试包预填的 `admin12345678` 登录失败（401） | 真实库的管理员密码此前在后台改过，与测试包预填的默认测试密码不同；bcrypt 哈希不可反推 | 前台内容不受影响；后台改用用户自己的密码登录，或经用户确认后重建测试包时通过 `VITE_TEST_PASSWORD` 注入正确密码 | 预填凭据只对“用同一套初始密码创建的库”有效；换库后要重新核对凭据，不要误判为登录功能坏了 |
+| 重置密码后登录一直跳回登录页 | 一次性哈希脚本命名 `_tmp_hash.go`，Go 构建会忽略下划线开头的文件，`go run` 报 `no Go files in ...`；脚本没校验退出码，把空哈希写进了 `admin.password_hash` | 改名 `tmp_hash_gen.go`，写入前断言哈希长度 60、`UPDATE` 影响行数为 1；重启后用浏览器验证预填登录成功（31 篇 / 8 个项目正常） | 一次性 Go 脚本别用 `_` 开头；写库脚本必须校验生成物非空且影响行数，失败即中止 |
+| 390px 下编辑页横向溢出 34px | `.editor-row` 固定三列，日期控件固有宽度约 159px，挤出了窄屏容器 | ≤640px 改为单列并给表单控件加 `min-width: 0`，复测溢出为 0 | 响应式自检不能只看主内容区，要逐个元素找 `getBoundingClientRect().right > innerWidth` 的真凶 |
+
+### 密码重置记录（2026-11-17，经用户同意）
+
+- 操作对象：真实开发库 `/tmp/dn-dev/notes.db` 的 `admin` 表；操作前备份为 `notes.db.bak-before-pwd-reset`。
+- 结果：管理员 `admin` 的密码重置为默认测试密码，测试包预填可一键登录；`bcrypt.DefaultCost` 生成 60 字符哈希，更新行数 1。
+- 验证：`/admin/login` 不输入直接点登录 → `/admin/notes`，后台 31 篇笔记 / 8 个项目，控制台错误 0。
 
 ## 待办清单
 
@@ -533,11 +562,11 @@ v1.4.4 · Section 3 已完成，Section 4 进行中：8 个项目共 31 篇，�
 
 | 位置 | 当前值 |
 |---|---|
-| `app/VERSION` / `app/main.go` | `1.4.4` |
-| `web/package.json` / `web/package-lock.json` | `1.4.4` |
-| `web/src/version.ts` | `APP_VERSION = '1.4.4'` |
-| `web/src/views/AboutView.vue` / 后台侧栏 / 登录页 | `{{ VERSION_LINE }}` → `v1.4.4 by Mr lin` |
-| `doc/*.md` / `README.md` / `CHANGELOG.md` | `v1.4.4` |
+| `app/VERSION` / `app/main.go` | `1.4.5` |
+| `web/package.json` / `web/package-lock.json` | `1.4.5` |
+| `web/src/version.ts` | `APP_VERSION = '1.4.5'` |
+| `web/src/views/AboutView.vue` / 后台侧栏 / 登录页 | `{{ VERSION_LINE }}` → `v1.4.5 by Mr lin` |
+| `doc/*.md` / `README.md` / `CHANGELOG.md` | `v1.4.5` |
 
 `scripts/build.sh` 在编译前校验 `app/main.go` 的 `var version` 与 `app/VERSION` 一致，不一致直接失败。原型工程 `prototype/` 仍为 `v1.0.3`，作为冻结基线不再跟随版本。
 
@@ -562,6 +591,6 @@ DATA_DIR=/tmp/dn-dev HTTP_ADDR=:18091 \
   SESSION_SECRET=0123456789abcdef0123456789abcdef ./app/build/dev-notes
 ```
 
-`DATA_DIR` 决定看到哪份内容：真实开发库在 `/tmp/dn-dev/notes.db`（8 个项目 / 31 篇笔记）；临时库（如 `/tmp/dn-login`）只有造数数据。重启前先确认旧服务挂载的目录，不要直接换新目录，否则会表现为「笔记和项目找不到」。管理员密码若在后台改过，测试包预填的默认密码会失效，需用当前密码登录或重建测试包时通过 `VITE_TEST_PASSWORD` 注入。运行时上传的图片写入 `DATA_DIR/media/`，备份时要一并带上；构建产物 `web/public/media/` 里的预置图仍随二进制发布。
+`DATA_DIR` 决定看到哪份内容：真实开发库在 `/tmp/dn-dev/notes.db`（8 个项目 / 31 篇笔记）；临时库（如 `/tmp/dn-login`）只有造数数据。重启前先确认旧服务挂载的目录，不要直接换新目录，否则会表现为「笔记和项目找不到」。管理员密码若在后台改过，测试包预填的默认密码会失效，需用当前密码登录或重建测试包时通过 `VITE_TEST_PASSWORD` 注入。**2026-11-17 已按用户同意把真实库密码重置为默认测试密码，测试包预填可直接登录。** 运行时上传的图片写入 `DATA_DIR/media/`，备份时要一并带上；构建产物 `web/public/media/` 里的预置图仍随二进制发布。
 
 详细说明见 `doc/DEPLOY.md` 第二节与 `doc/PROJECT.md` 第七节。

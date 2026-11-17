@@ -1115,6 +1115,17 @@ tbody tr:hover {
   gap: 16px;
 }
 
+/* 窄屏三列会把日期控件的固有宽度挤出屏幕，改为单列并允许收缩。 */
+@media (max-width: 640px) {
+  .editor-row {
+    grid-template-columns: 1fr;
+  }
+  .form-grid input,
+  .form-grid select {
+    min-width: 0;
+  }
+}
+
 .editor-textarea {
   min-height: 340px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;

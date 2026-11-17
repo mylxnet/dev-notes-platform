@@ -4,11 +4,11 @@ import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import {
   createProject,
   listProjects,
-  previewMarkdown,
   updateProject,
   uploadMedia,
   type ProjectInput
 } from '../../admin'
+import MarkdownEditor from '../../components/MarkdownEditor.vue'
 import { ApiError, errorMessageOf, statusText, type ContentStatus } from '../../api'
 
 const route = useRoute()
@@ -38,10 +38,6 @@ const form = ref({
 })
 
 const statuses: ContentStatus[] = ['published', 'draft', 'hidden']
-
-const showDescriptionPreview = ref(false)
-const descriptionHtml = ref('')
-const previewLoading = ref(false)
 
 const coverFileInput = ref<HTMLInputElement | null>(null)
 const uploadingCover = ref(false)
@@ -161,23 +157,6 @@ async function save() {
     }
   } finally {
     saving.value = false
-  }
-}
-
-async function toggleDescriptionPreview() {
-  if (showDescriptionPreview.value) {
-    showDescriptionPreview.value = false
-    return
-  }
-  previewLoading.value = true
-  error.value = ''
-  try {
-    descriptionHtml.value = await previewMarkdown(form.value.description)
-    showDescriptionPreview.value = true
-  } catch (err) {
-    error.value = errorMessageOf(err)
-  } finally {
-    previewLoading.value = false
   }
 }
 
@@ -312,21 +291,7 @@ onBeforeRouteLeave(() => {
           <span>项目说明（Markdown，可留空）</span>
           <span class="section-subtitle">{{ descriptionBytes() }} / {{ maxDescriptionBytes }} 字节</span>
         </div>
-        <textarea
-          v-model="form.description"
-          class="editor-textarea"
-          placeholder="支持标题、列表、代码块、表格；不允许原始 HTML 与外链图片"
-        />
-        <div class="row-actions" style="margin-top: 10px">
-          <button class="btn" type="button" :disabled="previewLoading || saving" @click="toggleDescriptionPreview">
-            {{ previewLoading ? '渲染中…' : showDescriptionPreview ? '关闭预览' : '预览说明' }}
-          </button>
-        </div>
-      </div>
-
-      <div v-if="showDescriptionPreview">
-        <div class="section-subtitle">预览（服务端渲染并净化）</div>
-        <div class="article-markdown preview-panel" v-html="descriptionHtml" />
+        <MarkdownEditor v-model="form.description" :disabled="saving" :min-height="300" />
       </div>
 
       <div class="row-actions">

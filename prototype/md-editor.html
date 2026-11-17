@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Markdown 编辑器界面原型 · dev-notes-platform</title>
+  <style>
+    :root {
+      --bg: #f7f8fa;
+      --surface: #ffffff;
+      --border: #e3e6ec;
+      --text: #20242b;
+      --muted: #697386;
+      --accent: #2f6df6;
+      --accent-soft: #eef3ff;
+      --code-bg: #f2f4f8;
+      --red: #d64545;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+      font-size: 14px;
+    }
+    .wrap { max-width: 1180px; margin: 0 auto; padding: 28px 24px 60px; }
+    h1 { font-size: 1.5rem; margin: 0 0 6px; }
+    .sub { color: var(--muted); margin: 0 0 24px; line-height: 1.7; }
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+    .toolbar { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+    .toolbar button {
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text);
+      border-radius: 7px;
+      min-width: 32px;
+      height: 30px;
+      padding: 0 8px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .toolbar button:hover { background: var(--accent-soft); border-color: var(--border); }
+    .toolbar button:disabled { opacity: 0.55; cursor: not-allowed; }
+    .upload-error { color: var(--red); font-size: 12px; margin-left: 6px; }
+    .toolbar .sep { width: 1px; height: 18px; background: var(--border); margin: 0 4px; }
+    .modes { display: flex; gap: 4px; }
+    .modes button {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--muted);
+      border-radius: 7px;
+      height: 30px;
+      padding: 0 10px;
+      cursor: pointer;
+    }
+    .modes button.active { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+    .split { display: grid; grid-template-columns: 1fr 1fr; min-height: 420px; }
+    .split.edit-only { grid-template-columns: 1fr; }
+    .split.preview-only { grid-template-columns: 1fr; }
+    .pane { min-width: 0; padding: 16px; }
+    .pane + .pane { border-left: 1px solid var(--border); }
+    .pane-label {
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+    }
+    textarea {
+      width: 100%;
+      height: 360px;
+      resize: vertical;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      font-family: Consolas, "Cascadia Code", monospace;
+      font-size: 13px;
+      line-height: 1.75;
+      color: var(--text);
+      background: var(--surface);
+      outline: none;
+    }
+    textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+    .preview {
+      min-height: 360px;
+      border: 1px dashed var(--border);
+      border-radius: 10px;
+      padding: 14px 18px;
+      background: #fcfdff;
+      line-height: 1.8;
+      overflow-wrap: anywhere;
+    }
+    .preview h2 { font-size: 1.25rem; margin: 20px 0 8px; }
+    .preview h3 { font-size: 1.05rem; margin: 16px 0 6px; }
+    .preview p { margin: 8px 0; }
+    .preview ul, .preview ol { padding-left: 22px; margin: 8px 0; }
+    .preview blockquote {
+      border-left: 3px solid var(--accent);
+      margin: 10px 0;
+      padding: 4px 12px;
+      color: var(--muted);
+      background: var(--accent-soft);
+    }
+    .preview code { background: var(--code-bg); border-radius: 4px; padding: 2px 5px; }
+    .preview pre { background: var(--code-bg); border-radius: 8px; padding: 12px; overflow: auto; }
+    .preview pre code { background: transparent; padding: 0; }
+    .preview img { max-width: 100%; border-radius: 8px; }
+    .preview a { color: var(--accent); }
+    hr { border: 0; border-top: 1px solid var(--border); margin: 18px 0; }
+    .foot {
+      padding: 10px 14px;
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 12px;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .tip { margin-top: 20px; color: var(--muted); line-height: 1.8; }
+    .tip code { background: var(--code-bg); border-radius: 4px; padding: 2px 5px; }
+    @media (max-width: 760px) {
+      .split { grid-template-columns: 1fr; }
+      .pane + .pane { border-left: 0; border-top: 1px solid var(--border); }
+      .topbar { align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>笔记正文 · Markdown 编辑器（界面原型）</h1>
+    <p class="sub">左侧输入、右侧即时预览；工具栏按钮把光标选中的文字包成对应 Markdown 语法。正文仍按原文保存，服务端渲染规则不变。</p>
+
+    <div class="panel">
+      <div class="topbar">
+        <input type="file" id="imageInput" accept="image/png,image/jpeg,image/webp" hidden />
+        <div class="toolbar" id="toolbar">
+          <button type="button" data-md="h2" title="二级标题">H2</button>
+          <button type="button" data-md="h3" title="三级标题">H3</button>
+          <span class="sep"></span>
+          <button type="button" data-md="bold" title="粗体"><b>B</b></button>
+          <button type="button" data-md="italic" title="斜体"><i>I</i></button>
+          <span class="sep"></span>
+          <button type="button" data-md="quote" title="引用">❝</button>
+          <button type="button" data-md="ul" title="无序列表">• 列表</button>
+          <button type="button" data-md="ol" title="有序列表">1. 列表</button>
+          <span class="sep"></span>
+          <button type="button" data-md="link" title="链接">🔗 链接</button>
+          <button type="button" data-md="image" title="站内图片">🖼 图片</button>
+          <span class="sep"></span>
+          <button type="button" data-md="code" title="行内代码">&lt;/&gt;</button>
+          <button type="button" data-md="codeblock" title="代码块">{ }</button>
+          <button type="button" data-md="hr" title="分隔线">—</button>
+        </div>
+        <div class="modes">
+          <button type="button" data-mode="split" class="active">分栏</button>
+          <button type="button" data-mode="edit">仅编辑</button>
+          <button type="button" data-mode="preview">仅预览</button>
+        </div>
+      </div>
+
+      <div class="split" id="split">
+        <div class="pane" id="editPane">
+          <div class="pane-label"><span>Markdown 原文</span><span id="counter">0 字符</span></div>
+          <textarea id="source" spellcheck="false" aria-label="Markdown 正文"></textarea>
+        </div>
+        <div class="pane" id="previewPane">
+          <div class="pane-label"><span>实时预览（与服务端同规则）</span><span>滚动独立</span></div>
+          <div class="preview" id="preview"></div>
+        </div>
+      </div>
+
+      <div class="foot">
+        <span>「图片」按钮演示选文件 → 上传中状态 → 插入语法并预览；真实实现复用 POST /api/admin/media/upload</span>
+        <span>v1.4.4 界面原型 · by Mr lin</span>
+      </div>
+    </div>
+
+    <p class="tip">确认要点：① 工具栏按钮是否够用、顺序是否顺手；② 分栏比例与独立滚动是否合适；③ 窄屏自动上下排列；④ 与现有「预览说明」按钮是否重复（真实实现会保留原按钮作为兜底）。</p>
+  </div>
+
+  <script>
+    // 原型内的极简 Markdown 渲染，只为演示排版；真实实现直接复用服务端预览接口。
+    const source = document.getElementById('source')
+    const preview = document.getElementById('preview')
+    const counter = document.getElementById('counter')
+    const split = document.getElementById('split')
+
+    const sample = `## 这次解决了什么问题
+
+原来的编辑器是一块纯文本输入框，写 **Markdown** 要手打符号，效率低还容易写错。
+
+- 工具栏点一下就能插入标题、粗体、列表
+- 右侧边写边预览，不用保存再看效果
+- 正文仍以 Markdown 原文入库
+
+> 注意：图片只支持站内路径。
+
+### 用法
+
+1. 选中文字后点「粗体」
+2. 光标停在某行点「H2」
+3. 插入链接后把文字替换成标题
+
+参考：[项目文档](https://example.com/doc)
+`
+    source.value = sample
+
+    function escapeHtml(text) {
+      return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    }
+
+    function inline(text) {
+      let value = escapeHtml(text)
+      value = value.replace(/`([^`]+)`/g, '<code>$1</code>')
+      value = value.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+      value = value.replace(/\*([^*]+)\*/g, '<em>$1</em>')
+      value = value.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img alt="$1" src="$2" />')
+      value = value.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+      return value
+    }
+
+    function render(markdown) {
+      const lines = markdown.replace(/\r\n/g, '\n').split('\n')
+      const output = []
+      let listType = ''
+      let inCode = false
+      let codeBuffer = []
+
+      function closeList() {
+        if (listType) {
+          output.push(`</${listType}>`)
+          listType = ''
+        }
+      }
+
+      for (const line of lines) {
+        if (line.trim().startsWith('```')) {
+          if (inCode) {
+            output.push(`<pre><code>${escapeHtml(codeBuffer.join('\n'))}</code></pre>`)
+            codeBuffer = []
+            inCode = false
+          } else {
+            closeList()
+            inCode = true
+          }
+          continue
+        }
+        if (inCode) { codeBuffer.push(line); continue }
+
+        const heading = line.match(/^(#{2,3})\s+(.*)$/)
+        if (heading) {
+          closeList()
+          const level = heading[1].length === 2 ? 'h2' : 'h3'
+          output.push(`<${level}>${inline(heading[2])}</${level}>`)
+          continue
+        }
+        const ul = line.match(/^[-*]\s+(.*)$/)
+        const ol = line.match(/^\d+\.\s+(.*)$/)
+        if (ul || ol) {
+          const needed = ul ? 'ul' : 'ol'
+          if (listType !== needed) { closeList(); output.push(`<${needed}>`); listType = needed }
+          output.push(`<li>${inline((ul || ol)[1])}</li>`)
+          continue
+        }
+        if (/^---+$/.test(line.trim())) { closeList(); output.push('<hr />'); continue }
+        if (line.trim() === '') { closeList(); continue }
+        if (line.startsWith('> ')) {
+          closeList()
+          output.push(`<blockquote>${inline(line.slice(2))}</blockquote>`)
+          continue
+        }
+        closeList()
+        output.push(`<p>${inline(line)}</p>`)
+      }
+      if (inCode) output.push(`<pre><code>${escapeHtml(codeBuffer.join('\n'))}</code></pre>`)
+      closeList()
+      preview.innerHTML = output.join('')
+    }
+
+    function refresh() {
+      counter.textContent = `${source.value.length} 字符`
+      render(source.value)
+    }
+
+    source.addEventListener('input', refresh)
+
+    // 工具栏：把选中的文字包成语法，没选中时插入带占位的光标位置。
+    const wrappers = {
+      h2: ['\n## ', '\n'], h3: ['\n### ', '\n'],
+      bold: ['**', '**'], italic: ['*', '*'],
+      quote: ['\n> ', '\n'], ul: ['\n- ', ''], ol: ['\n1. ', ''],
+      link: ['[', '](https://example.com)'],
+      image: ['![说明](/media/example.png)', ''],
+      code: ['`', '`'],
+      codeblock: ['\n```\n', '\n```\n'],
+      hr: ['\n---\n', '']
+    }
+
+    // 图片按钮不再插入占位路径，而是选文件 → 模拟上传 → 插入真实图片语法。
+    const imageInput = document.getElementById('imageInput')
+    const imageButton = document.querySelector('[data-md="image"]')
+    let uploadError = null
+
+    imageButton.addEventListener('click', () => imageInput.click())
+    imageInput.addEventListener('change', async () => {
+      const file = imageInput.files && imageInput.files[0]
+      imageInput.value = ''
+      if (!file) return
+
+      if (uploadError) { uploadError.remove(); uploadError = null }
+      if (!/\.(png|jpe?g|webp)$/i.test(file.name)) {
+        showUploadError('只支持 PNG、JPG、WEBP 图片')
+        return
+      }
+      if (file.size > 2 * 1024 * 1024) {
+        showUploadError('图片不能超过 2 MB')
+        return
+      }
+
+      imageButton.disabled = true
+      imageButton.textContent = '上传中…'
+      // 原型没有后端：用本地 URL 模拟服务端返回的站内路径。
+      await new Promise((resolve) => setTimeout(resolve, 600))
+      const imageUrl = URL.createObjectURL(file)
+      const alt = file.name.replace(/\.[^.]+$/, '')
+      const insert = `![${alt}](${imageUrl})`
+      const start = source.selectionStart
+      const end = source.selectionEnd
+      source.setRangeText(insert, start, end, 'end')
+      source.setSelectionRange(start + 2, start + 2 + alt.length)
+      source.focus()
+      imageButton.disabled = false
+      imageButton.textContent = '🖼 图片'
+      refresh()
+    })
+
+    function showUploadError(message) {
+      uploadError = document.createElement('span')
+      uploadError.className = 'upload-error'
+      uploadError.textContent = message
+      imageButton.after(uploadError)
+    }
+
+    document.getElementById('toolbar').addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-md]')
+      if (!button || button.dataset.md === 'image') return
+      const [before, after] = wrappers[button.dataset.md]
+      const start = source.selectionStart
+      const end = source.selectionEnd
+      const selected = source.value.slice(start, end)
+      const insert = before + (selected || '') + after
+      source.setRangeText(insert, start, end, 'end')
+      if (!selected) {
+        const caret = start + before.length
+        source.setSelectionRange(caret, caret)
+      }
+      source.focus()
+      refresh()
+    })
+
+    document.querySelector('.modes').addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-mode]')
+      if (!button) return
+      document.querySelectorAll('.modes button').forEach((item) => item.classList.toggle('active', item === button))
+      const mode = button.dataset.mode
+      split.className = `split ${mode === 'edit' ? 'edit-only' : mode === 'preview' ? 'preview-only' : ''}`
+      document.getElementById('editPane').style.display = mode === 'preview' ? 'none' : ''
+      document.getElementById('previewPane').style.display = mode === 'edit' ? 'none' : ''
+    })
+
+    refresh()
+  </script>
+</body>
+</html>
