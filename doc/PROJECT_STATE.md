@@ -1,12 +1,25 @@
 # 项目状态 · 我的开发笔记
 
-> v1.3.2 · by Mr lin · 2026-11-17
+> v1.3.3 · by Mr lin · 2026-11-17
 
 ## 当前版本
 
-v1.3.2 · Section 3 已完成：后台管理与认证、内容前置校验、Markdown 渲染净化、前台正文改为服务端渲染；本轮开始 Section 4，文章源进仓库并打通可重复导入。下一阶段继续录入真实内容（项目 6 个、笔记余量）。
+v1.3.3 · Section 3 已完成，Section 4 进行中：文章源进 `content/notes/` 并打通可重复导入；SuperClip-C 与 LanFileShare 各 4 篇已录入，三个项目卡片的仓库地址与技术栈已改为真实值。下一阶段：SiteGuard 的真实内容、替换早期占位笔记。
 
-## 本轮改动记录（v1.3.2，2026-11-17）
+## 本轮改动记录（v1.3.3，2026-11-17）
+
+- 录入 LanFileShare 4 篇：`http-listener-to-tcplistener`、`streaming-multipart-1mb-window`、`device-name-to-safe-path`、`ua-model-detection`，素材来自该仓库 `README.md` / `DEVELOPMENT.md` / `RELEASES.md`。
+- 项目卡片纠错（走管理 API `PUT /api/admin/projects/:id`）：仓库地址从 `github.com/example/*` 占位改为 `mylxnet/site-guard`、`mylxnet/SuperClip-C`、`mylxnet/LanFileShare`；技术栈分别改为 `Node.js/ESM/单容器自托管`、`C++/Win32 API/CMake`、`C#/WPF/.NET 8`。
+- 仓库事实核对来自 GitHub API（`users/mylxnet/repos` 与各仓库 `contents`），不靠猜：`site-guard` 的 `package.json` 显示 `engines.node >=22.13`、唯一依赖 `nodemailer`、MIT。
+
+### 验收证据（v1.3.3，2026-11-17）
+
+- 导入：`创建 4，更新 0，跳过 4，失败 0`（幂等，已存在的 4 篇 SuperClip-C 文章被跳过）。
+- `/api/notes` 总数 7 → 11；`/api/projects` 中 `lanfileshare` 的 `note_count` 1 → 5。
+- 浏览器（Chromium 1280px）：`/projects/siteguard|superclip|lanfileshare` 详情页分别渲染出 `源码仓库 →` 外链，指向三个真实仓库；技术栈标签与上表一致。
+- 4 篇新文章详情页：`h1` 正确，`h2` 分别为 6/5/4/6，代码块 2/2/2/3 正常高亮，表格正常渲染。
+
+## 历史改动记录（v1.3.2，2026-11-17）
 
 - 新增 `content/notes/`：文章为 Markdown + 头部字段（`title`/`slug`/`summary`/`project`/`status`/`published_at`），随代码版本化。
 - 新增 `tools/import-notes.sh`：登录管理 API 后逐篇导入，`project` 按项目 slug 解析为 `project_id`；按 slug 幂等，默认跳过已存在，`MODE=update` 覆盖。
@@ -192,6 +205,7 @@ v1.3.2 · Section 3 已完成：后台管理与认证、内容前置校验、Mar
 | 正文里 `/media/xxx.svg` 的图片被净化后 `src` 清空 | 图片白名单仍是 `^/assets/`，`/media/` 不在允许目录内 | 白名单放宽为 `^/(?:assets|media)/`，测试补 `/media/` 正例 | 新增资源目录时要同步检查净化白名单与静态下发两处，只加文件不改白名单等于没生效 |
 | 正文 SVG 插图在窄容器下被压扁变形 | SVG 自带 `width`/`height` 属性，CSS 只写 `max-width: 100%` 不会让高度自适应 | 补 `display: block` 与 `height: auto` | 替换元素（img/svg）缩放宽度的同时必须显式放开高度，否则比例丢失 |
 | 页脚「v1.3.0 by Mr lin」被右下角主题按钮压住 | 主题按钮 `position: fixed`，页脚没有为它预留空间 | 页脚右内边距留 132px，≤600px 改为底部留白 76px | 固定定位元素会覆盖正常流内容，页脚类区域必须预留避让空间 |
+| 主仓库 `app/`、`doc/`、`tools/`、`scripts/` 突然"消失"，但 `git status` 不报删除 | 误在本仓库执行了 `git sparse-checkout set --no-cone '/*.md'`（本想对 `.tmp_lfs` 克隆执行，`cd` 失败后落到了父仓库），149 个文件被标 `skip-worktree`，工作区只剩根目录 md | `git sparse-checkout disable` 恢复；核验 `Test-Path` 与 `git ls-tree -r HEAD` 文件数（152）一致 | 在仓库内做临时克隆/实验前先确认当前目录；`skip-worktree` 会让缺文件看起来"没改过"，排查时先查 `git ls-files -v` 的 S 标记 |
 | 用内网 IP 以 http 访问后台，登录后立刻被踢回登录页、无法新增或修改 | `COOKIE_SECURE` 默认 `true`，Cookie 带 `Secure`，HTTP 下被浏览器丢弃 → `/api/admin/me` 401 | `COOKIE_SECURE` 改为三档，默认 `auto` 按请求协议判断（含 `X-Forwarded-Proto`） | Secure Cookie 只在 HTTPS 与 localhost 生效，本机测试通过不代表换地址可用；会话类问题先看 Cookie 是否落盘 |
 | `TestParseRejectsTamperedSession` 时好时坏 | 用例改写 base64url 末位字符，末位含未使用位，解码后字节可能完全相同，篡改等于没改 | 改为改写签名段首字符，保证解码字节必变 | 校验签名的用例不能靠「改一个字符」想当然，要确认改动真的改变了字节 |
 
@@ -199,11 +213,12 @@ v1.3.2 · Section 3 已完成：后台管理与认证、内容前置校验、Mar
 
 1. 确认 mailhub 正确仓库地址，或决定移除
 2. 确认 6 个项目的真实 GitHub 地址与许可证状态
-3. Section 4 进行中：已录入 SuperClip-C 的 4 篇；剩余 SiteGuard、LanFileShare 的真实内容与项目地址待确认
-4. 录入文章时为 `siteguard-origin.svg`、`mailhub-imap-cursor.svg` 补正文引用
-5. `tools/import-notes.sh` 目前只处理新建与更新，未做正文配图上传（插图仍走 `web/public/media/`）
-6. Section 5：Docker + 1Panel 部署 + 浏览器验收
-7. 每个 Section 完成后升小版本、同步文档并提交
+3. Section 4 进行中：SuperClip-C 与 LanFileShare 各 4 篇已录入；SiteGuard 仍只有 1 篇早期占位笔记，需按其仓库真实内容重写
+4. 占位笔记 `lan-discovery`（讲 UDP 广播与 Go，与实际 C# 实现不符）待替换或下线，尚未处理
+5. 录入文章时为 `siteguard-origin.svg`、`mailhub-imap-cursor.svg` 补正文引用
+6. `tools/import-notes.sh` 目前只处理新建与更新，未做正文配图上传（插图仍走 `web/public/media/`）
+7. Section 5：Docker + 1Panel 部署 + 浏览器验收
+8. 每个 Section 完成后升小版本、同步文档并提交
 
 ## 版本一致性检查
 
@@ -211,10 +226,10 @@ v1.3.2 · Section 3 已完成：后台管理与认证、内容前置校验、Mar
 
 | 位置 | 当前值 |
 |---|---|
-| `app/VERSION` / `app/main.go` | `1.3.2` |
-| `web/package.json` / `web/package-lock.json` | `1.3.2` |
-| `web/src/components/SiteFooter.vue` / 后台侧栏 / 登录页 | `v1.3.2 by Mr lin` |
-| `doc/*.md` / `README.md` / `CHANGELOG.md` | `v1.3.2` |
+| `app/VERSION` / `app/main.go` | `1.3.3` |
+| `web/package.json` / `web/package-lock.json` | `1.3.3` |
+| `web/src/components/SiteFooter.vue` / 后台侧栏 / 登录页 | `v1.3.3 by Mr lin` |
+| `doc/*.md` / `README.md` / `CHANGELOG.md` | `v1.3.3` |
 
 `scripts/build.sh` 在编译前校验 `app/main.go` 的 `var version` 与 `app/VERSION` 一致，不一致直接失败。原型工程 `prototype/` 仍为 `v1.0.3`，作为冻结基线不再跟随版本。
 

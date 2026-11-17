@@ -1,8 +1,8 @@
 # 技术方案 · 我的开发笔记
 
-> v1.3.2 · by Mr lin · 2026-11-17
+> v1.3.3 · by Mr lin · 2026-11-17
 >
-> 依据：`doc/DESIGN.md` v1.3.2、已确认的 `prototype/` 第一版界面。本文档是后续编码、测试、部署的实施依据，代码实现与本文档不一致时，以本文档评审结论为准。
+> 依据：`doc/DESIGN.md` v1.3.3、已确认的 `prototype/` 第一版界面。本文档是后续编码、测试、部署的实施依据，代码实现与本文档不一致时，以本文档评审结论为准。
 
 ## 一、方案目标与范围
 
@@ -515,7 +515,7 @@ v1.3.0 实现位置：字段规则与词汇拦截在 `internal/validate`，渲�
 | 动效 | 仅 `transform` / `opacity`；150–300ms；尊重 `prefers-reduced-motion` |
 | 状态 | 每个列表必须提供加载、空、错误三态 |
 | 反馈 | 保存按钮提交中禁用并显示“保存中”；删除必须二次确认 |
-| 版本 | 页脚、后台侧栏与登录页显示 `v1.3.2 by Mr lin`，版本号在署名之前 |
+| 版本 | 页脚、后台侧栏与登录页显示 `v1.3.3 by Mr lin`，版本号在署名之前 |
 
 ### 6.5 后台交互
 
@@ -849,6 +849,7 @@ ADMIN_PASSWORD=你的密码 MODE=update bash tools/import-notes.sh
 
 | 版本 | 日期 | 变更 |
 |---|---|---|
+| v1.3.3 | 2026-11-17 | 录入 LanFileShare 的 4 篇技术复盘；`repo_url` 与 `tech_stack` 纠正为真实值（`https://github.com/mylxnet/*`） |
 | v1.3.2 | 2026-11-17 | 新增 `content/notes/` 文章源与 `tools/import-notes.sh`（按 slug 幂等），录入 SuperClip-C 的 4 篇技术复盘 |
 | v1.3.1 | 2026-11-17 | 修复 HTTP 访问下 Secure Cookie 被丢弃导致后台登录后立即失效；`COOKIE_SECURE` 改为 auto/true/false 三档并新增对应测试 |
 | v1.3.0 | 2026-11-17 | 新增站内配图目录 `/media/`：图片白名单放宽至 `/assets/` 与 `/media/`；正文图片改为等比自适应；新增两张技术插图（SiteGuard 同源判定、mailhub IMAP 游标） |

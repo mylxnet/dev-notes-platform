@@ -6,6 +6,7 @@
 
 | 版本 | 日期 | 摘要 |
 |---|---|---|
+| v1.3.3 | 2026-11-17 | 录入 LanFileShare 的 4 篇技术复盘，三个项目卡片的仓库地址与技术栈改为真实值 |
 | v1.3.2 | 2026-11-17 | 新增 `content/notes/` 文章源与 `tools/import-notes.sh` 导入工具，录入 SuperClip-C 的 4 篇技术复盘 |
 | v1.3.1 | 2026-11-17 | 修复 HTTP 访问下 Secure Cookie 被丢弃导致后台登录后立即失效 |
 | v1.3.0 | 2026-11-17 | 新增站内配图目录 `/media/` 与两张技术插图，正文图片按容器等比缩放 |
@@ -17,6 +18,22 @@
 | v1.0.0 | 2026-11-17 | 初始设计方案 |
 
 ## 详细更新日志（按版本倒序）
+
+### v1.3.3 · 2026-11-17
+
+**新增**
+
+- 录入 LanFileShare 的 4 篇技术复盘：`http-listener-to-tcplistener`（http.sys 抢端口导致端口在听但收不到请求）、`streaming-multipart-1mb-window`（1MB 滑动窗口把内存与文件大小解耦，附终止符分支死锁）、`device-name-to-safe-path`（客户端设备名的四层路径防御）、`ua-model-detection`（UA 精简后用 Client Hints 取型号）。
+
+**修复**
+
+- 三个项目卡片的仓库地址由占位符（`github.com/example/*`）改为真实地址：`mylxnet/site-guard`、`mylxnet/SuperClip-C`、`mylxnet/LanFileShare`。
+- 技术栈纠错：SiteGuard 由 `Python/FastAPI` 改为 `Node.js/ESM/单容器自托管`；SuperClip-C 由 `Go/WPF/SQLite` 改为 `C++/Win32 API/CMake`；LanFileShare 由 `Go/HTTP/Web` 改为 `C#/WPF/.NET 8`。
+- 三处项目简介改为与仓库实际定位一致（不再出现「局域网零配置发现」这类与实际实现不符的描述）。
+
+**调整**
+
+- 版本统一升至 `v1.3.3`：`app/VERSION`、`app/main.go`、`web/package.json`/lock、页脚、后台侧栏与登录页、文档同步。
 
 ### v1.3.2 · 2026-11-17
 
