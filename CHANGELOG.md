@@ -6,6 +6,8 @@
 
 | 版本 | 日期 | 摘要 |
 |---|---|---|
+| v1.4.7 | 2026-11-25 | 项目页改版：横向缩略图卡片（contain 以高为准、居中留空）、详情页图文并排，图片不再放大 |
+| v1.4.6 | 2026-11-17 | 补齐 Docker 构建链：多阶段 Dockerfile、1Panel Compose、阿里云推送脚本，重写部署手册 |
 | v1.4.5 | 2026-11-17 | 笔记正文与项目说明接入带工具栏、实时分栏预览和图片上传的 Markdown 编辑器 |
 | v1.4.4 | 2026-11-17 | 后台项目封面支持选择图片上传，服务端安全校验后写入 DATA_DIR/media，无需重新打包 |
 | v1.4.3 | 2026-11-17 | 后台「站点设置」可维护 ICP 备案号，前台页脚从公开接口读取，未填写显示占位 |
@@ -40,6 +42,52 @@
 | v1.0.0 | 2026-11-17 | 初始设计方案 |
 
 ## 详细更新日志（按版本倒序）
+
+### v1.4.7 · 2026-11-25
+
+**新增**
+
+- 项目索引与首页项目卡片改为「左缩略图 + 右信息」横向布局：缩略图固定 208×156（4:3），`object-fit: contain` 以高为准、水平居中、两边留白；没有封面的项目显示首字母占位块，尺寸与有图卡片一致，整行卡片高度统一。
+- 项目详情页截图支持点击放大：全屏灯箱 + 模糊遮罩、右上角关闭按钮，支持 Esc 与点击遮罩关闭，打开时锁定页面滚动；放大视图按原图尺寸上限显示，不放大原图。
+
+**优化**
+
+- 项目详情页改为「左说明 + 右截图」并排：截图限高 520px、按比例居中、不放大不裁切，外套窗口栏；关联笔记移到下方独立区块。
+- 卡片摘要限两行、底部「关联笔记数 / 查看详情」沉底对齐；窄屏（≤640px）卡片自动改为上下排列。
+- 清理不再使用的 `.project-cover`、`.project-hero`、`.about-grid` 样式。
+
+**修复**
+
+- 详情页封面原为 `width: 100%`，1030px 宽的截图在 1180px 容器里被放大到 1180px，又糊又占满一屏；改为限高 520px、宽度按比例自适应、居中显示。
+
+**调整**
+
+- `deploy/docker-compose.yml` 镜像 tag 跟到 `1.4.7`，并注明「tag 必须先用 `scripts/push-image.sh` 推送」；`doc/DEPLOY.md` 升到 v1.4.7，二进制路径与健康检查示例版本号同步。
+- `doc/PROJECT_STATE.md` 验收命令由 `/tmp/dn-dev` 改为 `deploy/data` 副本（WSL 重启清空 `/tmp`，旧路径不可靠）。
+- 发包：`1.4.7` 与 `latest` 镜像已推送阿里云（`application/vnd.oci.image.manifest.v1+json`，88.1 MB），云端拉取后容器 `Up (healthy)`、`/healthz` 返回 `1.4.7`。
+- 版本升至 `v1.4.7`（版本字段与文档同步）。
+
+### v1.4.6 · 2026-11-17
+
+**新增**
+
+- `deploy/Dockerfile`：多阶段构建（Node 22 编前端、Go 1.27 编后端、alpine 3.20 运行），按 `TARGETOS/TARGETARCH` 在目标架构内编译，非 root 运行、带 healthcheck；依赖源默认走 npmmirror / goproxy.cn。
+- `deploy/docker-compose.yml`：1Panel 可直接粘贴，镜像 `registry.cn-hangzhou.aliyuncs.com/mylxnet/dev-notes:1.4.6`，端口只绑 `127.0.0.1:8080`，数据卷 `./data:/app/data`，必填变量用 `${VAR:?}` 防弱密码上线。
+- `scripts/push-image.sh`：构建并推送 amd64 镜像，版本取自 `app/VERSION`，支持 `--tag` 覆盖，复用已登录的 Docker 会话，不保存凭据。
+- `deploy/.env.example` 与根 `.dockerignore`：提供变量模板并缩小构建上下文。
+
+**优化**
+
+- `doc/DEPLOY.md` 从 v1.3.5 重写到 v1.4.6：补齐二进制 + systemd 与 Docker + 1Panel Compose 两条路线、环境变量表、备份/升级/回滚、备案合规步骤与故障排查；修掉「引用不存在的 Compose 文件」的过期内容。
+
+**修复**
+
+- 推送阿里云报 `unknown manifest class for application/vnd.oci.empty.v1+json`：Docker 29 默认 BuildKit 附带 OCI 空 manifest，ACR 拒收；改用 `DOCKER_BUILDKIT=0` 走 legacy builder，Dockerfile 同步固定 amd64 编译（legacy builder 不识别 `BUILDPLATFORM`/`TARGETARCH` 自动变量）。
+
+**调整**
+
+- 只推 amd64：推送脚本用 legacy builder + `docker push`，产物为不含 attestation 的 OCI image manifest；已验证云端拉取、容器启动与 `/healthz` 返回 `1.4.6` 全通过。
+- 版本升至 `v1.4.6`（5 处版本字段 + 文档）。
 
 ### v1.4.5 · 2026-11-17
 

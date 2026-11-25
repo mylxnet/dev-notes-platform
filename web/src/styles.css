@@ -444,61 +444,227 @@ h2 {
 .project-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
+  gap: 16px;
 }
 
+/* 横向卡片：左缩略图固定 208×156，右侧信息自适应 */
 .project-card {
+  display: grid;
+  grid-template-columns: 208px minmax(0, 1fr);
+  gap: 20px;
+  align-items: stretch;
   border: 1px solid var(--border);
-  border-radius: 20px;
-  padding: 24px;
+  border-radius: 18px;
+  padding: 18px;
   background: var(--surface);
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
 .project-card:hover {
-  transform: translateY(-3px);
+  transform: translateY(-2px);
   box-shadow: var(--shadow);
-  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+}
+
+/* 缩略图：contain + 以高为准 + 居中留白，任何比例都不裁切、不放大 */
+.project-thumb {
+  width: 208px;
+  height: 156px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+
+.project-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* 无封面：细网格底 + 首字母，尺寸与有图缩略图一致 */
+.project-thumb.is-empty {
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 22px 22px;
+  background-position: center;
+}
+
+.project-thumb-initial {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 1.1rem;
+  letter-spacing: -0.02em;
+}
+
+.project-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
 .project-top {
   display: flex;
-  align-items: start;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
 }
 
 .project-name {
-  font-size: 1.16rem;
+  font-size: 1.04rem;
   font-weight: 650;
   letter-spacing: -0.02em;
 }
 
-/* 卡片封面定高定比保证同一行卡片齐平；用 contain 避免裁掉示意图上的文字。 */
-.project-cover {
-  display: block;
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  object-fit: contain;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  margin-bottom: 18px;
-  background: var(--surface-2);
+.card-go {
+  color: var(--accent);
 }
 
-/* 详情页封面按原始比例展示，不裁切封面上的文字。 */
-.project-hero {
-  /* 下方 .about-grid 自带 64px 上内边距，这里不再叠外边距。 */
+/* 详情页：左说明 + 右截图（有封面才两栏） */
+.project-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 36px;
+  align-items: start;
+  margin-top: 30px;
+}
+
+.project-layout.has-shot {
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+}
+
+.project-main h2 {
+  font-size: 1.05rem;
+  margin: 0 0 14px;
+}
+
+.project-shot {
   margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--surface);
+  box-shadow: var(--shadow);
 }
 
-.project-hero img {
+.project-shot-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.project-shot-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--mid);
+  opacity: 0.55;
+}
+
+/* 截图：以高为准、最高 520px，按比例居中，两边留空；不裁切、不放大 */
+.project-shot img {
+  display: block;
+  max-width: 100%;
+  max-height: 520px;
+  width: auto;
+  height: auto;
+  margin: 0 auto;
+}
+
+.project-shot figcaption {
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+  text-align: center;
+  color: var(--mid);
+  font-size: 0.76rem;
+}
+
+/* 截图可点击放大：按钮承担点击与键盘操作，图片样式沿用 .project-shot img */
+.project-shot-zoom {
   display: block;
   width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
+}
+
+.project-shot-zoom:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* 全屏灯箱：按原尺寸上限显示，图片本身不放大 */
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  background: rgba(20, 20, 19, 0.84);
+  backdrop-filter: blur(3px);
+  cursor: zoom-out;
+}
+
+.lightbox-img {
+  display: block;
+  width: auto;
   height: auto;
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  background: var(--surface-2);
+  max-width: 92vw;
+  max-height: 88vh;
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
+  cursor: default;
+}
+
+.lightbox-close {
+  position: absolute;
+  top: 18px;
+  right: 22px;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+
+.lightbox-close:hover {
+  background: rgba(255, 255, 255, 0.24);
+}
+
+.project-notes {
+  margin-top: 40px;
+  padding-top: 26px;
+  border-top: 1px solid var(--border);
+}
+
+.project-notes h2 {
+  font-size: 1.05rem;
+  margin: 0 0 12px;
 }
 
 /* 说明里的标题要低于「项目说明」这一节标题，避免层级倒挂。 */
@@ -516,10 +682,15 @@ h2 {
   margin-top: 22px;
 }
 
+/* 摘要最多两行，保证横向卡片高度稳定 */
 .project-summary {
   color: var(--muted);
-  font-size: 0.93rem;
-  margin: 10px 0 14px;
+  font-size: 0.86rem;
+  margin: 6px 0 10px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .tech-list {
@@ -542,10 +713,12 @@ h2 {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-top: 18px;
-  padding-top: 16px;
+  /* 横向卡片里让底部信息沉底，卡片等高时对齐 */
+  margin-top: auto;
+  padding-top: 12px;
   border-top: 1px solid var(--border);
-  font-size: 0.88rem;
+  font-size: 0.82rem;
+  color: var(--muted);
 }
 
 .card-foot a {
@@ -573,13 +746,6 @@ h2 {
 .status-hidden {
   background: var(--surface-2);
   color: var(--muted);
-}
-
-.about-grid {
-  display: grid;
-  grid-template-columns: 1fr 0.8fr;
-  gap: 64px;
-  padding: 64px 0;
 }
 
 .callout {
@@ -1124,6 +1290,27 @@ tbody tr:hover {
   .form-grid select {
     min-width: 0;
   }
+  /* 窄屏卡片改为上下排列，缩略图铺满一行 */
+  .project-card {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .project-thumb {
+    width: 100%;
+    height: 168px;
+  }
+  /* 窄屏灯箱留出更小边距，关闭按钮贴近角落 */
+  .lightbox {
+    padding: 16px;
+  }
+  .lightbox-img {
+    max-width: 96vw;
+    max-height: 82vh;
+  }
+  .lightbox-close {
+    top: 12px;
+    right: 14px;
+  }
 }
 
 .editor-textarea {
@@ -1247,7 +1434,6 @@ tbody tr:hover {
 @media (max-width: 900px) {
   .hero,
   .article,
-  .about-grid,
   .login-shell {
     grid-template-columns: 1fr;
     gap: 36px;
@@ -1265,6 +1451,10 @@ tbody tr:hover {
   }
 
   .project-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .project-layout.has-shot {
     grid-template-columns: 1fr;
   }
 

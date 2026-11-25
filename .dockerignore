@@ -1,0 +1,15 @@
+.git
+.gitignore
+node_modules
+web/node_modules
+app/internal/webui/dist
+prototype
+prototype-v2
+content
+doc
+test
+*.db
+*.db-shm
+*.db-wal
+*.log
+*.gz

@@ -1,14 +1,46 @@
 # 项目状态 · 我的开发笔记
 
-> v1.4.5 · by Mr lin · 2026-11-17
+> v1.4.7 · by Mr lin · 2026-11-25
 
 ## 当前版本
 
-v1.4.5 · Section 3 已完成，Section 4 进行中：8 个项目共 31 篇，全部为真实技术复盘（早期 3 篇占位笔记已不再重建）。数据库结构版本 `schemaVersion = 3`（新增 `settings` 表）。下一阶段：Section 5 部署。
+v1.4.7 · Section 3 已完成，Section 4 进行中：8 个项目共 31 篇，全部为真实技术复盘。数据库结构版本 `schemaVersion = 3`（新增 `settings` 表）。Section 5 部署：Docker 构建链就绪，`1.4.7` 镜像已推送阿里云并通过容器端到端冒烟；1Panel 上机待 ICP 备案通过。
 
-**当前 `app/build/dev-notes` 是测试包**：登录页预填测试账号密码，仅用于本机验收；对外发布必须重新执行 `bash scripts/build.sh`。服务当前挂载真实库 `/tmp/dn-dev/notes.db`，上传图片落在 `/tmp/dn-dev/media/`。
+**当前 `app/build/dev-notes` 是 `bash scripts/build.sh` 产出的正式包**（v1.4.7，明文凭据计数 0，可对外发）：需要一键登录的本机验收包用 `scripts/build-test.sh` 单独产出（计数 1），用完覆盖回正式包，测试包不得外发。本机验收数据用 `deploy/data` 的副本（WSL 重启会清空 `/tmp`，原来的 `/tmp/dn-dev` 已不可靠）。
 
-## 本轮改动记录（v1.4.5，2026-11-17）
+## 本轮改动记录（v1.4.7，2026-11-25）
+
+- 项目索引与首页项目卡片改为「左缩略图 + 右信息」横向布局：缩略图固定 208×156（4:3），`object-fit: contain` 以高为准、水平居中、两边留白；无封面用首字母占位块，卡片高度统一。
+- 项目详情页改为「左说明 + 右截图」并排，截图限高 520px、按比例居中、不放大不裁切；截图可点击打开全屏灯箱（模糊遮罩、Esc/点遮罩关闭、打开时锁滚动）。
+- 卡片摘要限两行、底部「关联笔记数 / 查看详情」沉底；≤640px 自动改为上下排列；清掉不再使用的 `.project-cover` / `.project-hero` / `.about-grid` 样式。
+- 部署与文档同步：`deploy/docker-compose.yml` 镜像 tag 跟到 `1.4.7`（含「必须先推送镜像」注释）、`doc/DEPLOY.md` 升到 v1.4.7、`doc/PROJECT_STATE.md` 验收命令由 `/tmp/dn-dev` 改为 `deploy/data` 副本。
+- 版本升至 `v1.4.7`（`app/VERSION` / `app/main.go` / `web/package.json` / `web/package-lock.json` / `web/src/version.ts` 五处 + 文档）。
+
+### 验收证据（v1.4.7，2026-11-25）
+
+- `go test ./... -count=1`（WSL `lxsyzd`）：`internal/api` 13.9s、`store` 2.9s 等全部 ok。
+- `bash scripts/build.sh`：版本一致性校验通过，前端 `vite build` 产出 `dist/index.html` 0.64 kB、CSS 22.39 kB、JS 172.40 kB，后端以 `embedui` 静态编译；最终产物为正式包（明文凭据计数 **0**）。
+- 本机冒烟（挂 `deploy/data` 的临时副本）：`/healthz` 返回 `{"db":"ok","status":"ok","version":"1.4.7"}`；`/api/projects` 返回 SiteGuard 等真实项目；`/api/notes` 返回已发布笔记；首页与 `/admin/login` 均 `200`；下发的 `/assets/index-*.js` 内含 `1.4.7`。
+- 发包（2026-11-25）：`bash scripts/push-image.sh` **RC=0**，`1.4.7` 与 `latest` 已推送阿里云；`docker buildx imagetools inspect` 显示 media type `application/vnd.oci.image.manifest.v1+json`、digest `sha256:ba93f61c…`（无 OCI 空 manifest）；镜像大小 88.1 MB。
+- 云端端到端：`docker pull` 后挂 `deploy/data` 副本（`chown -R 100:101`）起容器，状态 `Up (healthy)`，日志 `版本 1.4.7 env=production`；`/healthz` 返回 `{"db":"ok","status":"ok","version":"1.4.7"}`，`/api/projects` 返回真实项目，首页 `200`。
+
+## 历史改动记录（v1.4.6，2026-11-17）
+
+- 新增 `deploy/Dockerfile`：Node 22 编前端 → Go 1.27 按 `TARGETOS/TARGETARCH` 编后端 → alpine 3.20 运行；非 root、带 healthcheck，依赖走 npmmirror / goproxy.cn。
+- 新增 `deploy/docker-compose.yml`（1Panel 可直接粘贴）、`deploy/.env.example`、根 `.dockerignore`、`scripts/push-image.sh`（只推 amd64，传统 docker build + push，复用已登录会话，不写凭据）。
+- 重写 `doc/DEPLOY.md` 到 v1.4.6：二进制 + systemd 与 Docker + 1Panel Compose 两条路线、环境变量、备份/升级/回滚、备案步骤与故障排查。
+- 版本升至 `v1.4.6`（5 处版本字段 + 文档）。
+
+### 验收证据（v1.4.6，2026-11-17）
+
+- `go test ./...` 全部 ok；`bash scripts/build.sh` 版本一致性通过。
+- 镜像构建：`docker build --platform linux/amd64 -f deploy/Dockerfile -t dev-notes:1.4.6-selftest .` **RC=0**；构建日志显示多阶段前端/后端全部成功。
+- 容器冒烟（`docker run -p 18094:8080`）：`/healthz` 返回 `1.4.6`；`GET /api/notes`、`/api/projects`、`/api/site` 正常；登录拿到 CSRF 后 `POST /api/admin/media/upload` 返回 200 与 `/media/uploads/<32hex>.png`；`ls /app/data` 显示 `notes.db` 与 `media/` 均属 `app` 用户；镜像内 `id app` 实测为 uid=100(app) / gid=101(app)（alpine 中 gid 100 已占用，`addgroup -S app` 分到 101），故宿主机数据卷应 `chown -R 100:101`。
+- 修复记录：首版 Dockerfile 把 `app/` 复制到 `/src/app` 导致 `go build ./app` 报「主模块不包含该包」（app/go.mod 就是模块根，不应再套一层），改为 `COPY app/ ./` + `go build .` 后通过。用户要求取消 arm64，推送脚本改为只构建 amd64。
+- 镜像推送：`bash scripts/push-image.sh` **RC=0**，`1.4.6` 与 `latest` 均已上传阿里云；`docker buildx imagetools inspect` 显示 media type `application/vnd.oci.image.manifest.v1+json`（不含 OCI 空 manifest）。
+- 云端镜像端到端：从阿里云 `docker pull` 后带 `SESSION_SECRET` / `ADMIN_INIT_USERNAME` / `ADMIN_INIT_PASSWORD` 启容器，状态 `Up (healthy)`；`/healthz` 返回 `{"db":"ok","status":"ok","version":"1.4.6"}`，`/api/site` 正常。未传必需变量时容器按设计拒绝启动并给出明确错误。
+
+## 历史改动记录（v1.4.5，2026-11-17）
 
 - 新增 `web/src/components/MarkdownEditor.vue`，12 个工具栏按钮、Markdown 原文输入、实时分栏预览、三种视图模式与图片上传；接入 `AdminNoteEditView.vue` 正文与 `AdminProjectEditView.vue` 项目说明。
 - 预览走服务端 `POST /api/admin/preview`，400ms 防抖 + 请求序号只应用最新响应；上传走 `POST /api/admin/media/upload`，成功后插入 `![alt](/media/uploads/…)` 并选中 alt。
@@ -488,6 +520,7 @@ v1.4.5 · Section 3 已完成，Section 4 进行中：8 个项目共 31 篇，�
 | D27 | 站点配置用 `settings` 键值表，不往 `admin` 表加列 | 备案号是站点属性而非管理员属性；键值表后续加配置项无需迁移表结构。代价是 `schemaVersion` 升到 3，前台多一次极轻量的公开查询（整站只拉一次） |
 | D28 | 封面图支持上传，但只收 png/jpg/webp、禁 SVG，文件存 `DATA_DIR/media` | 解决「换图要重打包」痛点，同时把文件写入面压到最小：扩展名 + 内容嗅探双校验、随机名防穿越、2 MB 上限；SVG 可内嵌脚本故不支持。代价是备份要带上 media 目录 |
 | D29 | Markdown 编辑器自建组件，预览仍走服务端接口 | 依赖从简（不引第三方编辑器），正文原文与既有渲染/净化管线完全一致；用防抖与请求序号解决实时预览的接口压力与竞态。代价是工具栏交互代码要自己维护 |
+| D30 | Docker 镜像在容器内编译，只推 amd64，用 legacy builder 推送 | 不把 WSL 本地二进制硬塞进镜像；`DOCKER_BUILDKIT=0` 避开 Docker 29 BuildKit 附带的 OCI 空 manifest（ACR 拒收），产物为不含 attestation 的 OCI image manifest，云端拉取运行已验证。代价是构建比直接 COPY 二进制慢、legacy builder 已废弃、只覆盖 amd64 |
 
 ## 已知限制
 
@@ -538,6 +571,9 @@ v1.4.5 · Section 3 已完成，Section 4 进行中：8 个项目共 31 篇，�
 | 切回真实库后，测试包预填的 `admin12345678` 登录失败（401） | 真实库的管理员密码此前在后台改过，与测试包预填的默认测试密码不同；bcrypt 哈希不可反推 | 前台内容不受影响；后台改用用户自己的密码登录，或经用户确认后重建测试包时通过 `VITE_TEST_PASSWORD` 注入正确密码 | 预填凭据只对“用同一套初始密码创建的库”有效；换库后要重新核对凭据，不要误判为登录功能坏了 |
 | 重置密码后登录一直跳回登录页 | 一次性哈希脚本命名 `_tmp_hash.go`，Go 构建会忽略下划线开头的文件，`go run` 报 `no Go files in ...`；脚本没校验退出码，把空哈希写进了 `admin.password_hash` | 改名 `tmp_hash_gen.go`，写入前断言哈希长度 60、`UPDATE` 影响行数为 1；重启后用浏览器验证预填登录成功（31 篇 / 8 个项目正常） | 一次性 Go 脚本别用 `_` 开头；写库脚本必须校验生成物非空且影响行数，失败即中止 |
 | 390px 下编辑页横向溢出 34px | `.editor-row` 固定三列，日期控件固有宽度约 159px，挤出了窄屏容器 | ≤640px 改为单列并给表单控件加 `min-width: 0`，复测溢出为 0 | 响应式自检不能只看主内容区，要逐个元素找 `getBoundingClientRect().right > innerWidth` 的真凶 |
+| 镜像构建报「主模块不包含 dev-notes-platform/app 包」 | `go.mod` 就在 `app/` 里，Dockerfile 却把 `app/` 复制成 `/src/app`，形成嵌套模块被 Go 排除 | 改为 `COPY app/ ./` + `go build .`，模块根直接是 `/src` | 复制源码目录前先确认 `go.mod` 在哪一层；嵌套 go.mod 会让子目录被当成独立模块 |
+| 推送阿里云报 `unknown manifest class for application/vnd.oci.empty.v1+json` | Docker 29 默认 `docker build` 走 BuildKit，层已全部 Pushed 但附带 OCI 空 manifest（attestation），阿里云 ACR 不支持该 manifest class，最后一次推送被拒 | 推送脚本设 `DOCKER_BUILDKIT=0` 走 legacy builder；Dockerfile 去掉 `--platform=$BUILDPLATFORM/$TARGETPLATFORM` 与 `TARGETOS/TARGETARCH`，固定 `GOOS=linux GOARCH=amd64`（legacy builder 不识别这些自动变量）；重推 RC=0 | registry 报错先看具体 media type，别把「层已 Pushed」当成成功；单架构推送要确认 builder 会不会附带 attestation，再选兼容 registry 的方式 |
+| 凭印象给出数据卷属主 `chown 100:100`，与容器实际用户不符 | alpine 中 gid 100 已被系统占用，`addgroup -S app` 实际分到 gid 101，`adduser -S -G app app` 分到 uid 100 | 实测 `docker run --rm --entrypoint sh <镜像> -c "id app"` 得到 uid=100 / gid=101；部署文档与验收记录统一改为 `chown -R 100:101 ./data` | 非 root 容器的 uid/gid 必须实测，不能按「第一个普通用户是 100:100」推断；属主设错会导致数据卷只读、容器启动失败 |
 
 ### 密码重置记录（2026-11-17，经用户同意）
 
@@ -553,7 +589,7 @@ v1.4.5 · Section 3 已完成，Section 4 进行中：8 个项目共 31 篇，�
 4. `mailhub-imap-cursor.svg` 仍未在任何文章中被引用（`siteguard-origin.svg` 已随 `reverse-proxy-origin-403` 上线）；本轮 3 篇纯文字，没有插图
 5. `tools/import-notes.sh` 目前只处理新建与更新，未做正文配图上传（插图仍走 `web/public/media/`）
 6. 项目元数据（名称/摘要/技术栈/说明/封面路径）只存在于数据库，重建开发库要手工补录；考虑加一份 `content/projects.json` + 入库脚本，避免下次重来
-7. Section 5：Docker + 1Panel 部署 + 浏览器验收
+7. Section 5：Docker 构建链已就绪，`1.4.6` / `1.4.7` 镜像均在阿里云，`1.4.7` 已通过云端容器冒烟；待办是 1Panel 上机部署与浏览器验收（需 ICP 备案通过后再开放）
 8. 每个 Section 完成后升小版本、同步文档并提交
 
 ## 版本一致性检查
@@ -562,11 +598,11 @@ v1.4.5 · Section 3 已完成，Section 4 进行中：8 个项目共 31 篇，�
 
 | 位置 | 当前值 |
 |---|---|
-| `app/VERSION` / `app/main.go` | `1.4.5` |
-| `web/package.json` / `web/package-lock.json` | `1.4.5` |
-| `web/src/version.ts` | `APP_VERSION = '1.4.5'` |
-| `web/src/views/AboutView.vue` / 后台侧栏 / 登录页 | `{{ VERSION_LINE }}` → `v1.4.5 by Mr lin` |
-| `doc/*.md` / `README.md` / `CHANGELOG.md` | `v1.4.5` |
+| `app/VERSION` / `app/main.go` | `1.4.7` |
+| `web/package.json` / `web/package-lock.json` | `1.4.7` |
+| `web/src/version.ts` | `APP_VERSION = '1.4.7'` |
+| `web/src/views/AboutView.vue` / 后台侧栏 / 登录页 | `{{ VERSION_LINE }}` → `v1.4.7 by Mr lin` |
+| `doc/*.md` / `README.md` / `CHANGELOG.md` / `deploy/docker-compose.yml` 镜像 tag | `v1.4.7` |
 
 `scripts/build.sh` 在编译前校验 `app/main.go` 的 `var version` 与 `app/VERSION` 一致，不一致直接失败。原型工程 `prototype/` 仍为 `v1.0.3`，作为冻结基线不再跟随版本。
 
@@ -582,15 +618,16 @@ cd /mnt/e/app/网站备案/dev-notes-platform
 bash scripts/build.sh          # 产物：app/build/dev-notes
 
 # 本地开发：后端（终端 1）+ 前端（终端 2）
-cd app && DATA_DIR=/tmp/dn-dev SESSION_SECRET=0123456789abcdef0123456789abcdef \
+cd app && DATA_DIR=/mnt/e/app/网站备案/dev-notes-platform/deploy/data \
+  SESSION_SECRET=0123456789abcdef0123456789abcdef \
   HTTP_ADDR=127.0.0.1:8080 go run .
 cd web && npm run dev          # Vite 已把 /api 代理到 127.0.0.1:8080
 
-# 启动已打包的二进制做验收：必须挂真实开发库 /tmp/dn-dev
-DATA_DIR=/tmp/dn-dev HTTP_ADDR=:18091 \
+# 启动已打包的二进制做验收：挂 deploy/data 的副本
+DATA_DIR=/mnt/e/app/网站备案/dev-notes-platform/deploy/data HTTP_ADDR=:18091 \
   SESSION_SECRET=0123456789abcdef0123456789abcdef ./app/build/dev-notes
 ```
 
-`DATA_DIR` 决定看到哪份内容：真实开发库在 `/tmp/dn-dev/notes.db`（8 个项目 / 31 篇笔记）；临时库（如 `/tmp/dn-login`）只有造数数据。重启前先确认旧服务挂载的目录，不要直接换新目录，否则会表现为「笔记和项目找不到」。管理员密码若在后台改过，测试包预填的默认密码会失效，需用当前密码登录或重建测试包时通过 `VITE_TEST_PASSWORD` 注入。**2026-11-17 已按用户同意把真实库密码重置为默认测试密码，测试包预填可直接登录。** 运行时上传的图片写入 `DATA_DIR/media/`，备份时要一并带上；构建产物 `web/public/media/` 里的预置图仍随二进制发布。
+`DATA_DIR` 决定看到哪份内容：验收用的真实开发库副本在 `deploy/data`（`notes.db` + `media/`，8 个项目 / 31 篇笔记）；临时库（如 `deploy/data-login`）只有造数数据。**WSL 重启会清空 `/tmp`，原先的 `/tmp/dn-dev` 已不再使用。**重启前先确认旧服务挂载的目录，不要直接换新目录，否则会表现为「笔记和项目找不到」。管理员密码若在后台改过，测试包预填的默认密码会失效，需用当前密码登录或重建测试包时通过 `VITE_TEST_PASSWORD` 注入。**2026-11-17 已按用户同意把真实库密码重置为默认测试密码，测试包预填可直接登录。** 运行时上传的图片写入 `DATA_DIR/media/`，备份时要一并带上；构建产物 `web/public/media/` 里的预置图仍随二进制发布。
 
 详细说明见 `doc/DEPLOY.md` 第二节与 `doc/PROJECT.md` 第七节。

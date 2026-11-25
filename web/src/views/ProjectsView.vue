@@ -22,6 +22,11 @@ async function load() {
 }
 
 onMounted(load)
+
+function initialOf(name: string): string {
+  const head = name.trim().slice(0, 1)
+  return head ? head.toUpperCase() : '·'
+}
 </script>
 
 <template>
@@ -47,26 +52,30 @@ onMounted(load)
     </div>
     <div v-else-if="projects.length" class="project-grid">
       <RouterLink v-for="project in projects" :key="project.id" :to="`/projects/${project.slug}`" class="project-card">
-        <img
-          v-if="project.cover_image"
-          class="project-cover"
-          :src="project.cover_image"
-          :alt="`${project.name} 封面`"
-          loading="lazy"
-        />
-        <div class="project-top">
-          <span class="project-name">{{ project.name }}</span>
-          <span class="status" :class="`status-${project.status}`">
-            {{ projectStatusText[project.status] }}
-          </span>
+        <div class="project-thumb" :class="{ 'is-empty': !project.cover_image }">
+          <img
+            v-if="project.cover_image"
+            :src="project.cover_image"
+            :alt="`${project.name} 封面`"
+            loading="lazy"
+          />
+          <span v-else class="project-thumb-initial">{{ initialOf(project.name) }}</span>
         </div>
-        <p class="project-summary">{{ project.summary }}</p>
-        <div class="tech-list">
-          <span v-for="tech in techStackOf(project)" :key="tech">{{ tech }}</span>
-        </div>
-        <div class="card-foot">
-          <span>{{ project.note_count }} 篇关联笔记</span>
-          <span>查看详情 →</span>
+        <div class="project-body">
+          <div class="project-top">
+            <span class="project-name">{{ project.name }}</span>
+            <span class="status" :class="`status-${project.status}`">
+              {{ projectStatusText[project.status] }}
+            </span>
+          </div>
+          <p class="project-summary">{{ project.summary }}</p>
+          <div class="tech-list">
+            <span v-for="tech in techStackOf(project)" :key="tech">{{ tech }}</span>
+          </div>
+          <div class="card-foot">
+            <span>{{ project.note_count }} 篇关联笔记</span>
+            <span class="card-go">查看详情 →</span>
+          </div>
         </div>
       </RouterLink>
     </div>

@@ -1,0 +1,592 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>项目页改版原型 · 三方案对比</title>
+<style>
+  :root {
+    --bg: #faf9f5;
+    --surface: #ffffff;
+    --surface-2: #f2f0e8;
+    --text: #141413;
+    --muted: #6b6b63;
+    --mid: #b0aea5;
+    --border: #e8e6dc;
+    --accent: #d97757;
+    --accent-soft: rgba(217, 119, 87, 0.12);
+    --green-soft: rgba(120, 140, 93, 0.16);
+    --green: #5f7449;
+    --shadow: 0 18px 50px rgba(20, 20, 19, 0.06);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', system-ui, sans-serif;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  .container { width: min(100% - 48px, 1180px); margin-inline: auto; }
+
+  /* ---------- 原型工具条 ---------- */
+  .proto-bar {
+    position: sticky; top: 0; z-index: 50;
+    background: color-mix(in srgb, var(--bg) 92%, transparent);
+    backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border);
+  }
+  .proto-inner {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; height: 64px; flex-wrap: wrap;
+  }
+  .proto-title { font-size: 0.86rem; color: var(--muted); }
+  .proto-title strong { color: var(--text); font-weight: 650; }
+  .tabs { display: flex; gap: 6px; background: var(--surface-2); padding: 4px; border-radius: 999px; }
+  .tab {
+    border: 0; background: transparent; cursor: pointer;
+    padding: 8px 16px; border-radius: 999px;
+    font-size: 0.85rem; color: var(--muted); font-family: inherit;
+    transition: background 0.18s ease, color 0.18s ease;
+  }
+  .tab.active { background: var(--surface); color: var(--text); box-shadow: 0 2px 8px rgba(20,20,19,0.06); }
+
+  .view { display: none; padding: 44px 0 80px; }
+  .view.active { display: block; }
+
+  .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 28px; }
+  .page-head h1 { font-size: 1.6rem; margin: 0 0 4px; letter-spacing: -0.03em; }
+  .page-sub { color: var(--muted); font-size: 0.92rem; }
+  .scheme-note {
+    margin: 0 0 28px; padding: 12px 16px; border-radius: 12px;
+    background: var(--accent-soft); color: var(--text); font-size: 0.86rem;
+  }
+  .scheme-note b { color: var(--accent); }
+
+  /* ---------- 方案 A：横向缩略图卡片 ---------- */
+  .card-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .pcard {
+    display: grid; grid-template-columns: 208px minmax(0, 1fr);
+    gap: 20px; align-items: stretch;
+    padding: 18px; border: 1px solid var(--border); border-radius: 18px;
+    background: var(--surface); text-decoration: none; color: inherit;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  }
+  .pcard:hover {
+    transform: translateY(-2px); box-shadow: var(--shadow);
+    border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+  }
+  /* 4:3 缩略图：横图几乎铺满，方形/略竖图也比 16:10 饱满 */
+  .pthumb {
+    width: 208px; height: 156px; border-radius: 12px; overflow: hidden;
+    border: 1px solid var(--border); background: var(--surface-2);
+    display: grid; place-items: center; flex: none;
+  }
+  /* 统一 contain：横图铺满、竖图完整缩入并居中，绝不裁切或放大 */
+  .pthumb img { width: 100%; height: 100%; object-fit: contain; display: block; }
+
+  /* 无封面：首字母 + 细网格，尺寸与有图卡片完全一致 */
+  .pthumb.placeholder {
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 22px 22px;
+    background-position: center;
+  }
+  .pthumb .initial {
+    width: 48px; height: 48px; border-radius: 14px;
+    display: grid; place-items: center;
+    background: var(--surface); border: 1px solid var(--border);
+    font-weight: 700; font-size: 1.1rem; letter-spacing: -0.02em; color: var(--accent);
+  }
+  .pbody { display: flex; flex-direction: column; min-width: 0; }
+  .ptop { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+  .pname { font-size: 1.04rem; font-weight: 650; letter-spacing: -0.02em; margin: 0; }
+  .badge {
+    flex: none; padding: 2px 9px; border-radius: 999px; font-size: 0.72rem;
+    background: var(--green-soft); color: var(--green); white-space: nowrap;
+  }
+  .psum {
+    color: var(--muted); font-size: 0.86rem; margin: 6px 0 10px;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: auto; }
+  .chip {
+    padding: 2px 8px; border-radius: 7px; background: var(--surface-2);
+    color: var(--muted); font-size: 0.72rem;
+  }
+  .pfoot {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border);
+    font-size: 0.8rem; color: var(--muted);
+  }
+  .pfoot .go { color: var(--accent); }
+
+  /* ---------- 方案 B：信息主导列表 ---------- */
+  .plist { border-top: 1px solid var(--border); }
+  .prow {
+    display: grid; grid-template-columns: 56px minmax(0, 1fr) auto;
+    gap: 20px; align-items: center;
+    padding: 22px 8px; border-bottom: 1px solid var(--border);
+    text-decoration: none; color: inherit; border-radius: 10px;
+    transition: background 0.16s ease, transform 0.16s ease;
+  }
+  .prow:hover { background: var(--surface); transform: translateX(3px); }
+  .idx { font-size: 0.86rem; color: var(--mid); font-variant-numeric: tabular-nums; letter-spacing: 0.06em; }
+  .rname { font-size: 1.12rem; font-weight: 650; letter-spacing: -0.02em; margin: 0 0 4px; display: flex; align-items: center; gap: 10px; }
+  .rsum { color: var(--muted); font-size: 0.9rem; margin: 0 0 8px; max-width: 74ch; }
+  .rmeta { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 0.78rem; color: var(--muted); }
+  .rmeta .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--mid); }
+  .rright { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+  .rgo { color: var(--accent); font-size: 0.82rem; white-space: nowrap; }
+
+  /* ---------- 详情页 ---------- */
+  .dhead { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 10px; }
+  .eyebrow { font-size: 0.72rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--accent); font-weight: 700; }
+  .dhead h1 { font-size: 1.7rem; margin: 6px 0 6px; letter-spacing: -0.03em; }
+  .dhead .sub { color: var(--muted); font-size: 0.94rem; margin: 0; }
+
+  /* 关键：详情截图限宽居中 + 窗口外框，绝不放大 */
+  .shot-wrap { max-width: 880px; margin: 26px auto 0; }
+  .shot-frame {
+    border: 1px solid var(--border); border-radius: 16px; overflow: hidden;
+    background: var(--surface); box-shadow: var(--shadow);
+  }
+  .shot-bar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 14px; border-bottom: 1px solid var(--border);
+    background: var(--surface-2);
+  }
+  .shot-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--mid); opacity: 0.55; }
+  .shot-url { margin-left: 8px; font-size: 0.74rem; color: var(--muted); }
+  /* 详情页截图：限高 520，横图铺满容器、竖图按比例居中，均不放大 */
+  .shot-frame img {
+    display: block; max-width: 100%; max-height: 520px;
+    width: auto; height: auto; margin: 0 auto;
+  }
+  .shot-cap { text-align: center; font-size: 0.76rem; color: var(--mid); margin: 10px 0 0; }
+
+  .shot-wrap.narrow { max-width: 760px; }
+  .dgrid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.65fr); gap: 40px; margin-top: 40px; }
+
+  /* D2：图文并排，截图进右栏 */
+  .side-grid {
+    display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+    gap: 36px; align-items: start; margin-top: 30px;
+  }
+  .side-grid .shot-wrap { margin: 0; max-width: none; }
+  .dnotes { margin-top: 40px; border-top: 1px solid var(--border); padding-top: 26px; }
+  .dnotes .note-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 40px; }
+  .dgrid h2 { font-size: 1.05rem; margin: 0 0 14px; letter-spacing: -0.02em; }
+  .dtext p { color: var(--muted); font-size: 0.94rem; margin: 0 0 12px; max-width: 70ch; }
+  .note-item {
+    display: flex; justify-content: space-between; gap: 14px;
+    padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 0.9rem;
+    text-decoration: none; color: inherit;
+  }
+  .note-item span:last-child { color: var(--mid); font-size: 0.8rem; white-space: nowrap; }
+
+  @media (max-width: 960px) {
+    .card-grid { grid-template-columns: 1fr; }
+    .dgrid { grid-template-columns: 1fr; gap: 28px; }
+    .side-grid { grid-template-columns: 1fr; gap: 24px; }
+    .dnotes .note-list { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 620px) {
+    .container { width: calc(100% - 32px); }
+    .pcard { grid-template-columns: 1fr; gap: 14px; }
+    .pthumb { width: 100%; height: 168px; }
+    .prow { grid-template-columns: 1fr; gap: 8px; }
+    .idx { display: none; }
+    .rright { align-items: flex-start; flex-direction: row; }
+    .proto-inner { height: auto; padding: 12px 0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="proto-bar">
+  <div class="container proto-inner">
+    <div class="proto-title"><strong>项目页改版原型</strong> · 三方案对比 · 用真实项目数据</div>
+    <div class="tabs">
+      <button class="tab active" data-view="a">方案 A · 横向缩略图</button>
+      <button class="tab" data-view="b">方案 B · 信息主导列表</button>
+      <button class="tab" data-view="d1">详情页 · 限宽居中</button>
+      <button class="tab" data-view="d2">详情页 · 图文并排</button>
+      <button class="tab" data-view="p">竖图适配</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 方案 A ============ -->
+<section class="view active" id="view-a">
+  <div class="container">
+    <div class="page-head">
+      <div>
+        <h1>项目索引</h1>
+        <div class="page-sub">个人练习作品，共 8 个</div>
+      </div>
+    </div>
+    <p class="scheme-note"><b>方案 A</b>：封面 208×156 缩略图，<b>contain 以高为准、居中、两边留空</b>，不裁切不放大；没有封面的项目用首字母占位块，整格高度整齐、信息成为主角。</p>
+
+    <div class="card-grid">
+      <a class="pcard" href="#">
+        <div class="pthumb"><img src="../deploy/data/media/a43d10c0a7b57c5a163b6df115d5b6c6.jpg" alt="SiteGuard 页面截图" /></div>
+        <div class="pbody">
+          <div class="ptop"><h3 class="pname">SiteGuard</h3><span class="badge">已发布</span></div>
+          <p class="psum">网站哨兵，定时巡检关键页面，用「内容」而不是状态码判断网站是否正常，异常与篡改直接发邮件。</p>
+          <div class="chips"><span class="chip">Node.js</span><span class="chip">单容器自托管</span></div>
+          <div class="pfoot"><span>4 篇关联笔记</span><span class="go">查看详情 →</span></div>
+        </div>
+      </a>
+
+      <a class="pcard" href="#">
+        <div class="pthumb placeholder"><div class="initial">S</div></div>
+        <div class="pbody">
+          <div class="ptop"><h3 class="pname">SuperClip-C</h3><span class="badge">已发布</span></div>
+          <p class="psum">剪贴板历史管理工具，Win32 原生实现，键盘呼出即用。</p>
+          <div class="chips"><span class="chip">C++</span><span class="chip">Win32 API</span><span class="chip">CMake</span></div>
+          <div class="pfoot"><span>2 篇关联笔记</span><span class="go">查看详情 →</span></div>
+        </div>
+      </a>
+
+      <a class="pcard" href="#">
+        <div class="pthumb placeholder"><div class="initial">L</div></div>
+        <div class="pbody">
+          <div class="ptop"><h3 class="pname">LanFileShare</h3><span class="badge">已发布</span></div>
+          <p class="psum">局域网文件共享工具，手机扫码即可传文件，无需装客户端。</p>
+          <div class="chips"><span class="chip">C#</span><span class="chip">WPF</span><span class="chip">.NET 8</span></div>
+          <div class="pfoot"><span>3 篇关联笔记</span><span class="go">查看详情 →</span></div>
+        </div>
+      </a>
+
+      <a class="pcard" href="#">
+        <div class="pthumb placeholder"><div class="initial">E</div></div>
+        <div class="pbody">
+          <div class="ptop"><h3 class="pname">excelMailmerge</h3><span class="badge">已发布</span></div>
+          <p class="psum">按 Excel 名单批量生成文档并分发，替换手工逐份填写。</p>
+          <div class="chips"><span class="chip">C#</span><span class="chip">.NET 8</span><span class="chip">ClosedXML</span></div>
+          <div class="pfoot"><span>2 篇关联笔记</span><span class="go">查看详情 →</span></div>
+        </div>
+      </a>
+
+      <a class="pcard" href="#">
+        <div class="pthumb placeholder"><div class="initial">记</div></div>
+        <div class="pbody">
+          <div class="ptop"><h3 class="pname">记账管理平台</h3><span class="badge">已发布</span></div>
+          <p class="psum">个人记账与合同管理，单文件自托管，数据只在本地。</p>
+          <div class="chips"><span class="chip">Go</span><span class="chip">SQLite</span><span class="chip">Vue 3</span></div>
+          <div class="pfoot"><span>5 篇关联笔记</span><span class="go">查看详情 →</span></div>
+        </div>
+      </a>
+
+      <a class="pcard" href="#">
+        <div class="pthumb placeholder"><div class="initial">M</div></div>
+        <div class="pbody">
+          <div class="ptop"><h3 class="pname">MailHub</h3><span class="badge">已发布</span></div>
+          <p class="psum">自托管多账号邮件客户端，增量同步、后台定时收取。</p>
+          <div class="chips"><span class="chip">NestJS</span><span class="chip">React</span><span class="chip">Prisma</span></div>
+          <div class="pfoot"><span>6 篇关联笔记</span><span class="go">查看详情 →</span></div>
+        </div>
+      </a>
+
+      <a class="pcard" href="#">
+        <div class="pthumb placeholder"><div class="initial">Q</div></div>
+        <div class="pbody">
+          <div class="ptop"><h3 class="pname">QuickOcr</h3><span class="badge">已发布</span></div>
+          <p class="psum">屏幕框选即识别的 OCR 小工具，本地 Tesseract、离线可用。</p>
+          <div class="chips"><span class="chip">C#</span><span class="chip">WPF</span><span class="chip">Tesseract 5</span></div>
+          <div class="pfoot"><span>2 篇关联笔记</span><span class="go">查看详情 →</span></div>
+        </div>
+      </a>
+
+      <a class="pcard" href="#">
+        <div class="pthumb placeholder"><div class="initial">台</div></div>
+        <div class="pbody">
+          <div class="ptop"><h3 class="pname">台账汇总器</h3><span class="badge">已发布</span></div>
+          <p class="psum">把格式相同的 Excel 卡片式台账批量汇总成一张总表，单文件桌面工具。</p>
+          <div class="chips"><span class="chip">C#</span><span class="chip">.NET 8</span><span class="chip">ClosedXML</span></div>
+          <div class="pfoot"><span>3 篇关联笔记</span><span class="go">查看详情 →</span></div>
+        </div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 方案 B ============ -->
+<section class="view" id="view-b">
+  <div class="container">
+    <div class="page-head">
+      <div>
+        <h1>项目索引</h1>
+        <div class="page-sub">个人练习作品，共 8 个</div>
+      </div>
+    </div>
+    <p class="scheme-note"><b>方案 B</b>：完全不放大图，改用编号 + 名称 + 摘要 + 技术栈的排版列表。适合「多数项目没有截图」的现状，阅读效率最高。</p>
+
+    <div class="plist">
+      <a class="prow" href="#">
+        <span class="idx">01</span>
+        <div>
+          <h3 class="rname">SiteGuard <span class="badge">已发布</span></h3>
+          <p class="rsum">网站哨兵，定时巡检关键页面，用「内容」而不是状态码判断网站是否正常，异常与篡改直接发邮件到你的邮箱。</p>
+          <div class="rmeta"><span>Node.js、ESM、单容器自托管</span><span class="dot"></span><span>4 篇关联笔记</span></div>
+        </div>
+        <div class="rright"><span class="rgo">查看详情 →</span></div>
+      </a>
+
+      <a class="prow" href="#">
+        <span class="idx">02</span>
+        <div>
+          <h3 class="rname">SuperClip-C <span class="badge">已发布</span></h3>
+          <p class="rsum">剪贴板历史管理工具，Win32 原生实现，键盘呼出即用。</p>
+          <div class="rmeta"><span>C++ · Win32 API · CMake</span><span class="dot"></span><span>2 篇关联笔记</span></div>
+        </div>
+        <div class="rright"><span class="rgo">查看详情 →</span></div>
+      </a>
+
+      <a class="prow" href="#">
+        <span class="idx">03</span>
+        <div>
+          <h3 class="rname">LanFileShare <span class="badge">已发布</span></h3>
+          <p class="rsum">局域网文件共享工具，手机扫码即可传文件，无需装客户端。</p>
+          <div class="rmeta"><span>C# · WPF · .NET 8</span><span class="dot"></span><span>3 篇关联笔记</span></div>
+        </div>
+        <div class="rright"><span class="rgo">查看详情 →</span></div>
+      </a>
+
+      <a class="prow" href="#">
+        <span class="idx">04</span>
+        <div>
+          <h3 class="rname">excelMailmerge <span class="badge">已发布</span></h3>
+          <p class="rsum">按 Excel 名单批量生成文档并分发，替换手工逐份填写。</p>
+          <div class="rmeta"><span>C# · .NET 8 · WPF · ClosedXML</span><span class="dot"></span><span>2 篇关联笔记</span></div>
+        </div>
+        <div class="rright"><span class="rgo">查看详情 →</span></div>
+      </a>
+
+      <a class="prow" href="#">
+        <span class="idx">05</span>
+        <div>
+          <h3 class="rname">记账管理平台 <span class="badge">已发布</span></h3>
+          <p class="rsum">个人记账与合同管理，单文件自托管，数据只在本地。</p>
+          <div class="rmeta"><span>Go · SQLite · Vue 3 · Vant</span><span class="dot"></span><span>5 篇关联笔记</span></div>
+        </div>
+        <div class="rright"><span class="rgo">查看详情 →</span></div>
+      </a>
+
+      <a class="prow" href="#">
+        <span class="idx">06</span>
+        <div>
+          <h3 class="rname">MailHub <span class="badge">已发布</span></h3>
+          <p class="rsum">自托管多账号邮件客户端，增量同步、后台定时收取。</p>
+          <div class="rmeta"><span>NestJS · React · TypeScript · Prisma</span><span class="dot"></span><span>6 篇关联笔记</span></div>
+        </div>
+        <div class="rright"><span class="rgo">查看详情 →</span></div>
+      </a>
+
+      <a class="prow" href="#">
+        <span class="idx">07</span>
+        <div>
+          <h3 class="rname">QuickOcr <span class="badge">已发布</span></h3>
+          <p class="rsum">屏幕框选即识别的 OCR 小工具，本地 Tesseract、离线可用。</p>
+          <div class="rmeta"><span>C# · .NET 8 · WPF · Tesseract 5</span><span class="dot"></span><span>2 篇关联笔记</span></div>
+        </div>
+        <div class="rright"><span class="rgo">查看详情 →</span></div>
+      </a>
+
+      <a class="prow" href="#">
+        <span class="idx">08</span>
+        <div>
+          <h3 class="rname">台账汇总器 <span class="badge">已发布</span></h3>
+          <p class="rsum">把格式相同的 Excel 卡片式台账批量汇总成一张总表，单文件桌面工具。</p>
+          <div class="rmeta"><span>C# · .NET 8 · WPF · ClosedXML</span><span class="dot"></span><span>3 篇关联笔记</span></div>
+        </div>
+        <div class="rright"><span class="rgo">查看详情 →</span></div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 详情页 D1：限宽居中 ============ -->
+<section class="view" id="view-d1">
+  <div class="container">
+    <p class="scheme-note"><b>D1 · 限宽居中</b>：截图限宽 <b>760px</b> 居中、加窗口外框，原图 1030px 只缩小不拉伸。比现版全宽 1180px 小 36%，首屏不只剩一张图。</p>
+
+    <div class="dhead">
+      <div>
+        <div class="eyebrow">项目记录</div>
+        <h1>SiteGuard</h1>
+        <p class="sub">网站哨兵，定时巡检关键页面，用「内容」而不是状态码判断网站是否正常，异常与篡改直接发邮件到你的邮箱。</p>
+      </div>
+      <span class="badge">已发布</span>
+    </div>
+
+    <div class="shot-wrap narrow">
+      <div class="shot-frame">
+        <div class="shot-bar">
+          <span class="shot-dot"></span><span class="shot-dot"></span><span class="shot-dot"></span>
+          <span class="shot-url">siteguard · 巡检总览</span>
+        </div>
+        <img src="../deploy/data/media/a43d10c0a7b57c5a163b6df115d5b6c6.jpg" alt="SiteGuard 界面截图" />
+      </div>
+      <p class="shot-cap">巡检总览：站点状态、最近变更与邮件通知记录</p>
+    </div>
+
+    <div class="dgrid">
+      <div class="dtext">
+        <h2>项目说明</h2>
+        <p>一个自己部署的网站巡检工具：装在 NAS 的 Docker 里，浏览器打开就能用，数据全在自己手里。</p>
+        <p>它不靠 HTTP 200 判断「网站正常」，而是把页面抓下来看内容像不像一页正常网站——返回 200 的 502、空白页、维护页、跳去别的域名，都会被判为异常。</p>
+        <p>它记得你网站「原来长什么样」（基线），之后每次巡检对比：文字变了就报「内容变更」，打不开就报「异常」。</p>
+        <div class="chips" style="margin: 16px 0">
+          <span class="chip">Node.js</span><span class="chip">ESM</span><span class="chip">单容器自托管</span>
+        </div>
+        <a href="#" class="rgo" style="font-size: 0.9rem">源码仓库 →</a>
+      </div>
+      <div>
+        <h2>关联笔记</h2>
+        <a class="note-item" href="#"><span>内容基线巡检的实现取舍</span><span>2026-11-17</span></a>
+        <a class="note-item" href="#"><span>容器内定时任务与邮件重试</span><span>2026-11-16</span></a>
+        <a class="note-item" href="#"><span>反向代理下的 Host 校验</span><span>2026-11-15</span></a>
+        <a class="note-item" href="#"><span>单文件 SQLite 的并发边界</span><span>2026-11-14</span></a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 详情页 D2：图文并排 ============ -->
+<section class="view" id="view-d2">
+  <div class="container">
+    <p class="scheme-note"><b>D2 · 图文并排</b>：截图进<b>右栏卡片</b>，以高为准、最高 520px、水平居中、两边留空，不裁切不放大；左侧放说明与要点。</p>
+
+    <div class="dhead">
+      <div>
+        <div class="eyebrow">项目记录</div>
+        <h1>SiteGuard</h1>
+        <p class="sub">网站哨兵，定时巡检关键页面，用「内容」而不是状态码判断网站是否正常，异常与篡改直接发邮件到你的邮箱。</p>
+      </div>
+      <span class="badge">已发布</span>
+    </div>
+
+    <div class="side-grid">
+      <div class="dtext">
+        <h2>项目说明</h2>
+        <p>一个自己部署的网站巡检工具：装在 NAS 的 Docker 里，浏览器打开就能用，数据全在自己手里。</p>
+        <p>它不靠 HTTP 200 判断「网站正常」，而是把页面抓下来看内容像不像一页正常网站——返回 200 的 502、空白页、维护页、跳去别的域名，都会被判为异常。</p>
+        <p>它记得你网站「原来长什么样」（基线），之后每次巡检对比：文字变了就报「内容变更」，打不开就报「异常」。一轮巡检只发一封汇总邮件，只在状态变化时发。</p>
+        <div class="chips" style="margin: 16px 0">
+          <span class="chip">Node.js</span><span class="chip">ESM</span><span class="chip">单容器自托管</span>
+        </div>
+        <a href="#" class="rgo" style="font-size: 0.9rem">源码仓库 →</a>
+      </div>
+      <div>
+        <div class="shot-frame">
+          <div class="shot-bar">
+            <span class="shot-dot"></span><span class="shot-dot"></span><span class="shot-dot"></span>
+            <span class="shot-url">siteguard · 巡检总览</span>
+          </div>
+          <img src="../deploy/data/media/a43d10c0a7b57c5a163b6df115d5b6c6.jpg" alt="SiteGuard 界面截图" />
+        </div>
+        <p class="shot-cap">巡检总览：站点状态、最近变更与邮件通知记录</p>
+      </div>
+    </div>
+
+    <div class="dnotes">
+      <h2>关联笔记</h2>
+      <div class="note-list">
+        <a class="note-item" href="#"><span>内容基线巡检的实现取舍</span><span>2026-11-17</span></a>
+        <a class="note-item" href="#"><span>容器内定时任务与邮件重试</span><span>2026-11-16</span></a>
+        <a class="note-item" href="#"><span>反向代理下的 Host 校验</span><span>2026-11-15</span></a>
+        <a class="note-item" href="#"><span>单文件 SQLite 的并发边界</span><span>2026-11-14</span></a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 竖图适配对比 ============ -->
+<section class="view" id="view-p">
+  <div class="container">
+    <p class="scheme-note"><b>统一规则（已定稿）</b>：缩略图 <b>contain</b>、<b>以高为准</b>缩放、<b>水平居中、两边留空</b>，任何比例都不裁切、不放大；容器固定 4:3（208×156），卡片高度永远一致。</p>
+
+    <h2 style="font-size:1.05rem;margin:0 0 14px">三种比例在方案 A 缩略图里的实际效果</h2>
+    <div class="card-grid">
+      <div class="pcard">
+        <div class="pthumb"><img src="../deploy/data/media/a43d10c0a7b57c5a163b6df115d5b6c6.jpg" alt="横图 contain 效果" /></div>
+        <div class="pbody">
+          <div class="ptop"><h3 class="pname">横图 · 1030 × 650</h3><span class="badge">接近铺满</span></div>
+          <p class="psum">比例 1.58，接近 4:3 容器，contain 后几乎占满整个缩略图。</p>
+          <div class="chips"><span class="chip">1 : 0.63</span><span class="chip">上下少量留白</span></div>
+          <div class="pfoot"><span>卡片高度统一</span><span class="go">查看详情 →</span></div>
+        </div>
+      </div>
+      <div class="pcard">
+        <div class="pthumb"><img src="./assets/demo-window.jpg" alt="方形略竖 contain 效果" /></div>
+        <div class="pbody">
+          <div class="ptop"><h3 class="pname">方形略竖 · 520 × 587</h3><span class="badge">左右留空</span></div>
+          <p class="psum">以高为准缩入 156px，标题栏、搜索框、按钮完整可见，左右留白。</p>
+          <div class="chips"><span class="chip">1 : 1.13</span><span class="chip">SuperClip-C</span></div>
+          <div class="pfoot"><span>不裁切</span><span class="go">查看详情 →</span></div>
+        </div>
+      </div>
+      <div class="pcard">
+        <div class="pthumb"><img src="./assets/demo-vertical.jpg" alt="竖图 contain 效果" /></div>
+        <div class="pbody">
+          <div class="ptop"><h3 class="pname">竖图 · 390 × 844</h3><span class="badge">左右留空</span></div>
+          <p class="psum">按高度缩入，宽度自动收窄，左右留白最多，但内容一点不丢。</p>
+          <div class="chips"><span class="chip">1 : 2.16</span><span class="chip">手机界面</span></div>
+          <div class="pfoot"><span>不裁切</span><span class="go">查看详情 →</span></div>
+        </div>
+      </div>
+    </div>
+
+    <h2 style="font-size:1.05rem;margin:34px 0 14px">D2 详情页右栏 · 同样以高为准、居中留白</h2>
+    <div class="side-grid">
+      <div class="dtext">
+        <h2>项目说明</h2>
+        <p>详情页沿用同一条规则：<b>不裁切、不放大、以高为准</b>。截图最高 520px，宽度按原比例自动收窄并水平居中。</p>
+        <p>容器宽度内放得下的横图会尽量铺满；方形与竖图则以高度封顶，两侧留白由卡片底色填充。同一套 CSS 兼容所有方向：</p>
+        <pre style="background:var(--surface-2);padding:12px 14px;border-radius:10px;font-size:0.76rem;overflow:auto;color:var(--muted);margin:0 0 16px">img {
+  max-width: 100%;
+  max-height: 520px;
+  width: auto;
+  height: auto;
+  margin: 0 auto;
+}</pre>
+        <p>竖图更长（比如整页长截图 1:4）时不强行完整展示，改成「只显示顶部一屏 + 点击查看原图」。</p>
+        <div class="chips" style="margin:16px 0">
+          <span class="chip">竖图限高</span><span class="chip">横图铺满</span><span class="chip">不放大</span>
+        </div>
+      </div>
+      <div>
+        <div class="shot-frame">
+          <div class="shot-bar">
+            <span class="shot-dot"></span><span class="shot-dot"></span><span class="shot-dot"></span>
+            <span class="shot-url">竖版界面 · 390 × 844</span>
+          </div>
+          <img src="./assets/demo-vertical.jpg" alt="竖版界面截图" />
+        </div>
+        <p class="shot-cap">竖图限高 520px、按比例居中，并排布局不被撑破</p>
+      </div>
+    </div>
+
+    <p class="scheme-note" style="margin-top:16px">这张 SuperClip-C 截图中间是空白列表区，<b>contain</b> 会完整保留它，只是缩略图看着偏空——这属于截图内容本身的问题，换成有数据的截图即可，样式上不再为它妥协去裁切。</p>
+  </div>
+</section>
+
+<script>
+  const tabs = document.querySelectorAll('.tab')
+  const views = document.querySelectorAll('.view')
+  tabs.forEach((tab) => {
+    tab.addEventListener('click', () => {
+      tabs.forEach((t) => t.classList.remove('active'))
+      views.forEach((v) => v.classList.remove('active'))
+      tab.classList.add('active')
+      document.getElementById('view-' + tab.dataset.view).classList.add('active')
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    })
+  })
+</script>
+</body>
+</html>

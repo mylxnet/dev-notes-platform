@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import EmptyState from '../components/EmptyState.vue'
 import {
@@ -49,6 +49,28 @@ watch(
   },
   { immediate: true }
 )
+
+/** 灯箱：点击详情页截图后全屏放大展示 */
+const lightboxOpen = ref(false)
+
+function closeLightbox() {
+  lightboxOpen.value = false
+}
+
+function onLightboxKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && lightboxOpen.value) closeLightbox()
+}
+
+onMounted(() => window.addEventListener('keydown', onLightboxKeydown))
+onUnmounted(() => {
+  window.removeEventListener('keydown', onLightboxKeydown)
+  document.body.style.overflow = ''
+})
+
+// 打开灯箱时锁定页面滚动，避免背景跟着滚
+watch(lightboxOpen, (open) => {
+  document.body.style.overflow = open ? 'hidden' : ''
+})
 </script>
 
 <template>
@@ -60,7 +82,7 @@ watch(
         <div class="skeleton-line" style="width: 58%" />
       </div>
     </div>
-    <div class="about-grid">
+    <div class="project-layout has-shot">
       <div>
         <div class="skeleton-line" style="width: 90%" />
         <div class="skeleton-line" style="width: 76%" />
@@ -84,12 +106,8 @@ watch(
       </span>
     </div>
 
-    <figure v-if="project.cover_image" class="project-hero">
-      <img :src="project.cover_image" :alt="`${project.name} 封面`" />
-    </figure>
-
-    <div class="about-grid">
-      <div>
+    <div class="project-layout" :class="{ 'has-shot': project.cover_image }">
+      <div class="project-main">
         <h2>项目说明</h2>
         <div
           v-if="project.description_html"
@@ -115,16 +133,34 @@ watch(
           <span v-else class="section-subtitle">源码入口暂未提供</span>
         </p>
       </div>
-      <div>
-        <h2>关联笔记</h2>
-        <div v-if="relatedNotes.length" class="panel-list">
-          <RouterLink v-for="note in relatedNotes" :key="note.id" :to="`/notes/${note.slug}`" class="panel-item">
-            <span>{{ note.title }}</span>
-            <span>{{ formatDate(note.published_at) }}</span>
-          </RouterLink>
+
+      <figure v-if="project.cover_image" class="project-shot">
+        <div class="project-shot-bar" aria-hidden="true">
+          <span class="project-shot-dot" />
+          <span class="project-shot-dot" />
+          <span class="project-shot-dot" />
         </div>
-        <EmptyState v-else title="暂无已公开笔记" description="相关记录仍在整理中。" />
+        <button
+          type="button"
+          class="project-shot-zoom"
+          :aria-label="`放大查看 ${project.name} 界面截图`"
+          @click="lightboxOpen = true"
+        >
+          <img :src="project.cover_image" :alt="`${project.name} 界面截图`" loading="lazy" />
+        </button>
+        <figcaption>{{ project.name }} 界面截图 · 点击放大</figcaption>
+      </figure>
+    </div>
+
+    <div class="project-notes">
+      <h2>关联笔记</h2>
+      <div v-if="relatedNotes.length" class="panel-list">
+        <RouterLink v-for="note in relatedNotes" :key="note.id" :to="`/notes/${note.slug}`" class="panel-item">
+          <span>{{ note.title }}</span>
+          <span>{{ formatDate(note.published_at) }}</span>
+        </RouterLink>
       </div>
+      <EmptyState v-else title="暂无已公开笔记" description="相关记录仍在整理中。" />
     </div>
   </div>
 
@@ -140,4 +176,20 @@ watch(
     />
     <RouterLink to="/projects" class="back-link">返回项目索引</RouterLink>
   </div>
+
+  <Teleport to="body">
+    <div
+      v-if="lightboxOpen && project && project.cover_image"
+      class="lightbox"
+      role="dialog"
+      aria-modal="true"
+      :aria-label="`${project.name} 界面截图放大视图`"
+      @click.self="closeLightbox"
+    >
+      <button type="button" class="lightbox-close" aria-label="关闭放大视图" @click="closeLightbox">
+        ×
+      </button>
+      <img class="lightbox-img" :src="project.cover_image" :alt="`${project.name} 界面截图`" />
+    </div>
+  </Teleport>
 </template>
