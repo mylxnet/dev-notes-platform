@@ -4,7 +4,7 @@
 
 ## 当前版本
 
-v1.4.8 · Section 3 已完成，Section 4 进行中：8 个项目共 31 篇，全部为真实技术复盘。数据库结构版本 `schemaVersion = 3`（新增 `settings` 表）。Section 5 部署：Docker 构建链就绪，`1.4.7` 镜像已推送阿里云并通过容器端到端冒烟，`1.4.8` 镜像**尚未推送**；1Panel 上机待 ICP 备案通过。
+v1.4.8 · Section 3 已完成，Section 4 进行中：8 个项目共 31 篇，全部为真实技术复盘。数据库结构版本 `schemaVersion = 3`（新增 `settings` 表）。Section 5 部署：Docker 构建链就绪，`1.4.7` / `1.4.8` 镜像均已推送阿里云，`1.4.8` 已通过容器端到端冒烟；1Panel 上机待 ICP 备案通过。
 
 **当前 `app/build/dev-notes` 是 `bash scripts/build.sh` 产出的正式包**（v1.4.8，明文凭据计数 0，可对外发）：需要一键登录的本机验收包用 `scripts/build-test.sh` 单独产出（计数 1），用完覆盖回正式包，测试包不得外发。本机验收数据用 `deploy/data` 的副本（WSL 重启会清空 `/tmp`，原来的 `/tmp/dn-dev` 已不可靠）。
 
@@ -17,15 +17,18 @@ v1.4.8 · Section 3 已完成，Section 4 进行中：8 个项目共 31 篇，�
 - 后台新建笔记/项目支持「用标题（名称）生成」链接标识，编辑页不自动改写；新增 `web/src/slug.ts`，依赖 `pinyin-pro`（动态 import，只进后台编辑页 chunk）。
 - 首页右上角面板改为「推荐笔记」：后台站点设置三个推荐位（存 `settings.featured_notes`），`/api/site` 只下发存在且已发布的笔记，最多 3 条；全部为空时首页隐藏面板、hero 转单列。
 - 修复既有的窄屏问题：≤640px 时后台页头按钮被压成竖排文字（`.admin-heading` 改纵向堆叠、按钮 `white-space: nowrap`、`.row-actions` 允许换行）。
-- 本轮已执行 `bash scripts/build.sh` 打包，`app/build/dev-notes` 为 v1.4.8 正式包；镜像未推送。
+- 本轮已执行 `bash scripts/build.sh` 打包，`app/build/dev-notes` 为 v1.4.8 正式包；`bash scripts/push-image.sh` 已把 `1.4.8` 与 `latest` 推到阿里云。
 
 ### 验收证据（v1.4.8，2026-11-26）
 
-- 无头 Chromium（390×900 / 1280×900）跑 `verify_theme_btn.py`：390px 按钮 44×44、`border-radius: 50%`、文本长度 0、圆点居中偏差 0px、`title` =「当前为跟随系统，点击切换」；点一次后 `title` 变「当前为浅色，点击切换」、`data-theme="light"`。
+- 无头 Chromium（390×900 / 1280×900）跑 `test/theme_button_check.py`：390px 按钮 44×44、`border-radius: 50%`、文本长度 0、圆点居中偏差 0px、`title` =「当前为跟随系统，点击切换」；点一次后 `title` 变「当前为浅色，点击切换」、`data-theme="light"`。
 - 遮挡检查（滚到底、真实矩形相交）：公开 `/`、`/projects`、`/about` 与后台 `/admin/notes`、`/admin/notes/new`、`/admin/projects`、`/admin/settings`、`/admin/account` 全部 `[]`，横向溢出 0px。
 - 1280px：按钮 100×40，长文案「浅色主题」可见，`title` 正常。
 - 生产产物（`app/build/dev-notes` 起在 `:18080`，挂 `deploy/data` 副本）：`/healthz` 返回 `{"db":"ok","status":"ok","version":"1.4.8"}`；控制台报错 0（修复前有 5 条内联脚本 CSP 违规）；拦截业务 JS 后 `data-theme` 仍为 `dark`，证明 `theme-init.js` 在 Vue 挂载前生效；下发 CSS 中 `theme-short` 出现 0 次、含 `width:44px;height:44px;…border-radius:50%` 与 `padding:18px 18px 88px`。
 - 构建：`bash scripts/build.sh` 版本一致性校验通过（`1.4.8` 五处一致），`vite build` 3.59s，后端 `-tags embedui` 静态编译，产物 27.8 MB。
+- 发包（2026-11-26）：`bash scripts/push-image.sh` **RC=0**，`1.4.8` 与 `latest` 已推送阿里云；`docker manifest inspect` 显示 `application/vnd.oci.image.manifest.v1+json`（与 `1.4.7` 一致，无 OCI 空 manifest）；`latest` digest `sha256:4a8ef02957cc…`。
+- 云端镜像端到端：用推送后的 `1.4.8` 起容器（`-p 18085:8080`，挂 `deploy/data` 副本并 `chown -R 100:101`），状态 `Up (healthy)`，`/healthz` 返回 `{"db":"ok","status":"ok","version":"1.4.8"}`，首页 `200`、`/theme-init.js` `200`；对容器跑 `test/theme_button_check.py` 全部通过（44×44、无遮挡、CSP 报错 0）。
+- Git：提交 `b60b34e`，已推送 `origin/main`（`585d998..b60b34e`）。
 
 ### 本轮踩坑（v1.4.8）
 
@@ -614,7 +617,7 @@ v1.4.8 · Section 3 已完成，Section 4 进行中：8 个项目共 31 篇，�
 4. `mailhub-imap-cursor.svg` 仍未在任何文章中被引用（`siteguard-origin.svg` 已随 `reverse-proxy-origin-403` 上线）；本轮 3 篇纯文字，没有插图
 5. `tools/import-notes.sh` 目前只处理新建与更新，未做正文配图上传（插图仍走 `web/public/media/`）
 6. 项目元数据（名称/摘要/技术栈/说明/封面路径）只存在于数据库，重建开发库要手工补录；考虑加一份 `content/projects.json` + 入库脚本，避免下次重来
-7. Section 5：Docker 构建链已就绪，`1.4.6` / `1.4.7` 镜像均在阿里云，`1.4.7` 已通过云端容器冒烟；`1.4.8` 只出了本地二进制，**镜像待推送**。待办是 1Panel 上机部署与浏览器验收（需 ICP 备案通过后再开放）
+7. Section 5：Docker 构建链已就绪，`1.4.6` / `1.4.7` / `1.4.8` 镜像均在阿里云，`1.4.8` 已通过本地容器冒烟。待办是 1Panel 上机部署与浏览器验收（需 ICP 备案通过后再开放）
 8. 每个 Section 完成后升小版本、同步文档并提交
 
 ## 版本一致性检查

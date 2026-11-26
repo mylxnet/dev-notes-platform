@@ -110,7 +110,7 @@ tar czf backup-$(date +%F).tar.gz -C <compose目录> data
 6. 容器启动后看日志与健康检查，`curl -s http://127.0.0.1:8080/healthz` 应返回与 compose 中 tag 相同的版本号（当前 `1.4.8`）。
 7. 升级：改 compose 中镜像 tag（如 `:1.4.9`），1Panel 点「重新创建容器」，数据卷不变。回滚则改回旧 tag。
 
-> ⚠️ `1.4.8` 镜像截至 2026-11-26 **尚未推送**到阿里云，直接上机前先执行第 2 步的 `scripts/push-image.sh`；只想先上线可把 tag 暂时留给已推送的 `1.4.7`。
+> ℹ️ `1.4.8` 与 `latest` 已于 2026-11-26 推送阿里云（`application/vnd.oci.image.manifest.v1+json`），可直接上机；后续改版本号时记得先执行第 2 步的 `scripts/push-image.sh`，否则 1Panel 拉到该 tag 会失败。
 
 `deploy/.env.example` 不可删除；compose 用 `${VAR:?}` 强制变量存在，缺变量时容器拒绝启动，避免弱密码上线。
 

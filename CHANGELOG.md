@@ -70,7 +70,7 @@
 **调整**
 
 - 版本升至 `v1.4.8`（`app/VERSION`、`app/main.go`、`web/package.json`、`web/package-lock.json`、`web/src/version.ts` 五处 + 文档同步）。
-- `deploy/docker-compose.yml` 镜像 tag 跟到 `1.4.8`，**该镜像尚未推送**，部署前需先执行 `scripts/push-image.sh`。
+- `deploy/docker-compose.yml` 镜像 tag 跟到 `1.4.8`；`1.4.8` 与 `latest` 已于 2026-11-26 推送阿里云（`scripts/push-image.sh`），容器冒烟 `Up (healthy)`。
 
 **相关文件**
 
@@ -91,6 +91,7 @@
 | 生产产物 CSP | 控制台报错 0（修复前 5 条内联脚本违规） |
 | 拦截业务 JS 后首屏主题 | `data-theme="dark"`，证明 `theme-init.js` 在 Vue 之前已生效 |
 | 二进制冒烟 | `/healthz` 返回 `{"db":"ok","status":"ok","version":"1.4.8"}` |
+| 镜像发包 | `1.4.8` / `latest` 已推送阿里云；容器 `Up (healthy)`，`/healthz` 返回 `1.4.8`，首页与 `/theme-init.js` 均 `200` |
 
 ### v1.4.7 · 2026-11-25
 
