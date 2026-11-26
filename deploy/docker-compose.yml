@@ -4,7 +4,8 @@
 services:
   dev-notes:
     # tag 必须先在 WSL 内用 scripts/push-image.sh 推送，否则 1Panel 拉不到镜像。
-    image: registry.cn-hangzhou.aliyuncs.com/mylxnet/dev-notes:1.4.7
+    # 注意：1.4.8 镜像尚未推送（截至 2026-11-26），上机前先执行推送脚本。
+    image: registry.cn-hangzhou.aliyuncs.com/mylxnet/dev-notes:1.4.8
     container_name: dev-notes
     restart: unless-stopped
     ports:

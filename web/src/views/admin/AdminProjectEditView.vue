@@ -8,6 +8,7 @@ import {
   uploadMedia,
   type ProjectInput
 } from '../../admin'
+import { dedupeSlug, slugify } from '../../slug'
 import MarkdownEditor from '../../components/MarkdownEditor.vue'
 import { ApiError, errorMessageOf, statusText, type ContentStatus } from '../../api'
 
@@ -21,6 +22,10 @@ const loading = ref(isEdit.value)
 const saving = ref(false)
 const loaded = ref(!isEdit.value)
 const dirty = ref(false)
+/** 生成中的按钮状态，避免连点。 */
+const slugBusy = ref(false)
+/** 已占用的链接标识：新建时用于自动加后缀，取不到时交给后端唯一约束兜底。 */
+const takenSlugs = ref<string[]>([])
 
 const error = ref('')
 const fieldError = ref<{ field?: string; message: string; hits?: string[]; suggestion?: string } | null>(null)
@@ -96,6 +101,36 @@ function toInput(): ProjectInput {
   }
 }
 
+/** 新建时按项目名称生成链接标识；编辑已有项目不自动改，避免已发布链接失效。 */
+async function generateSlug() {
+  if (isEdit.value || slugBusy.value) return
+  const name = form.value.name.trim()
+  if (!name) {
+    fieldError.value = { field: 'name', message: '先填写项目名称，再生成链接标识' }
+    return
+  }
+  slugBusy.value = true
+  try {
+    const base = await slugify(name)
+    if (!base) {
+      fieldError.value = { field: 'slug', message: '名称里没有可转成字母的内容，请手动填写链接标识' }
+      return
+    }
+    form.value.slug = dedupeSlug(base, takenSlugs.value)
+    if (fieldError.value?.field === 'slug' || fieldError.value?.field === 'name') fieldError.value = null
+  } catch {
+    fieldError.value = { field: 'slug', message: '生成失败，请手动填写链接标识' }
+  } finally {
+    slugBusy.value = false
+  }
+}
+
+/** 离开名称框补一次生成；只在新建、且标识仍为空时触发，手改过的不覆盖。 */
+function onNameBlur() {
+  if (isEdit.value || form.value.slug.trim()) return
+  void generateSlug()
+}
+
 function validateLocally(): boolean {
   if (!form.value.name.trim() || form.value.name.trim().length > 120) {
     fieldError.value = { field: 'name', message: '项目名称需为 1–120 个字符' }
@@ -133,6 +168,10 @@ function validateLocally(): boolean {
 async function save() {
   error.value = ''
   fieldError.value = null
+  // 填完名称直接点保存时先补一次链接标识，避免被判成格式错误。
+  if (!isEdit.value && !form.value.slug.trim() && form.value.name.trim()) {
+    await generateSlug()
+  }
   if (!validateLocally()) return
 
   saving.value = true
@@ -169,9 +208,12 @@ watch(
 )
 
 onMounted(async () => {
-  if (!isEdit.value) return
   try {
-    const result = await listProjects()
+    // 一次取足量：编辑时用来定位当前项目，新建时用来收集已用链接标识。
+    const result = await listProjects({ pageSize: 100 })
+    takenSlugs.value = result.items.map((item) => item.slug)
+    if (!isEdit.value) return
+
     const project = result.items.find((item) => item.id === projectId.value)
     if (!project) {
       error.value = '项目不存在'
@@ -191,7 +233,8 @@ onMounted(async () => {
     loaded.value = true
     dirty.value = false
   } catch (err) {
-    error.value = errorMessageOf(err)
+    // 新建时列表拉不到只影响去重，不阻塞填写。
+    if (isEdit.value) error.value = errorMessageOf(err)
   } finally {
     loading.value = false
   }
@@ -233,11 +276,23 @@ onBeforeRouteLeave(() => {
     <form v-else class="form-grid form-grid-wide" novalidate @submit.prevent="save">
       <label>
         项目名称
-        <input v-model="form.name" type="text" maxlength="120" placeholder="1–120 个字符" />
+        <input v-model="form.name" type="text" maxlength="120" placeholder="1–120 个字符" @blur="onNameBlur" />
       </label>
       <label>
         链接标识（slug）
-        <input v-model="form.slug" type="text" placeholder="小写字母、数字与连字符，如 superclip" />
+        <div class="slug-field">
+          <input v-model="form.slug" type="text" maxlength="80" placeholder="小写字母、数字与连字符，如 superclip" />
+          <button
+            v-if="!isEdit"
+            class="btn"
+            type="button"
+            :disabled="slugBusy || saving"
+            @click="generateSlug"
+          >
+            {{ slugBusy ? '生成中…' : '用名称生成' }}
+          </button>
+        </div>
+        <span v-if="!isEdit" class="field-note">离开名称框会自动填一次；手动改过就以你填的为准</span>
       </label>
       <label>
         摘要

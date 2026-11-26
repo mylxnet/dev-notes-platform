@@ -150,7 +150,7 @@ dev-notes-platform/
 │   ├── src/views/         五个前台页面
 │   ├── src/views/admin/   登录、布局、笔记/项目管理、账号设置
 │   ├── src/components/    通用组件
-│   ├── public/media/      文章插图（SVG），构建时原样进产物
+│   ├── public/            原样进产物的静态资源：media/ 文章插图、theme-init.js 首屏定主题
 │   └── vite.config.ts     产物输出到 app/internal/webui/dist
 ├── content/notes/         文章源（Markdown + 头部字段），随代码版本化
 ├── tools/
@@ -205,7 +205,7 @@ dev-notes-platform/
 
 ### 📜 更新日志
 
-当前版本 **v1.4.7**（Section 3 已完成；Section 4 进行中：8 个项目、31 篇笔记，均为真实技术复盘，项目卡片指向真实源码仓库）。
+当前版本 **v1.4.8**（Section 3 已完成；Section 4 进行中：8 个项目、31 篇笔记，均为真实技术复盘，项目卡片指向真实源码仓库）。
 
 逐版本明细详见 [CHANGELOG.md](CHANGELOG.md)。
 

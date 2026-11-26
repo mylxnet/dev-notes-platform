@@ -2,12 +2,12 @@
 import {
   ApiError,
   requestJSON,
+  type AdminSettings,
   type ContentStatus,
   type Note,
   type PagedNotes,
   type PagedProjects,
-  type Project,
-  type SiteInfo
+  type Project
 } from './api'
 
 export interface AdminInfo {
@@ -162,12 +162,12 @@ export function uploadMedia(file: File): Promise<{ path: string }> {
   return adminRequest<{ path: string }>('/api/admin/media/upload', { method: 'POST', body: form })
 }
 
-export function fetchSettings(): Promise<SiteInfo> {
-  return adminRequest<SiteInfo>('/api/admin/settings')
+export function fetchSettings(): Promise<AdminSettings> {
+  return adminRequest<AdminSettings>('/api/admin/settings')
 }
 
-export function updateSettings(input: SiteInfo): Promise<SiteInfo> {
-  return adminRequest<SiteInfo>('/api/admin/settings', { method: 'PUT', body: input })
+export function updateSettings(input: AdminSettings): Promise<AdminSettings> {
+  return adminRequest<AdminSettings>('/api/admin/settings', { method: 'PUT', body: input })
 }
 
 export function createProject(input: ProjectInput): Promise<Project> {

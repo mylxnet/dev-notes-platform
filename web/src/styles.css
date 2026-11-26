@@ -194,10 +194,16 @@ button {
 
 .hero {
   display: grid;
-  grid-template-columns: 1.25fr 0.75fr;
+  /* minmax(0, …) 让两列可收缩，避免长标题把容器撑出横向滚动 */
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.75fr);
   gap: 64px;
   align-items: center;
   padding: 88px 0 60px;
+}
+
+/* 后台没配推荐笔记时隐藏右上角面板，标题区占满整行 */
+.hero.solo {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .eyebrow {
@@ -258,6 +264,7 @@ h2 {
 
 .panel-list {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .panel-item {
@@ -272,6 +279,14 @@ h2 {
 .panel-item:last-child {
   border-bottom: 0;
   padding-bottom: 0;
+}
+
+/* 标题过长时省略，避免把推荐面板撑宽（flex 子项默认 min-width:auto） */
+.panel-item span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .panel-item span:last-child {
@@ -848,7 +863,6 @@ h2 {
   z-index: 60;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
   padding: 8px 14px;
   border-radius: 999px;
   border: 1px solid var(--border);
@@ -867,8 +881,47 @@ h2 {
 .theme-dot {
   width: 10px;
   height: 10px;
+  margin-right: 8px;
   border-radius: 50%;
   background: var(--accent);
+}
+
+/* 跟随系统时用半色圆点表示「自动」，与手动浅色/深色区分 */
+.theme-dot.system {
+  background: linear-gradient(90deg, var(--accent) 50%, var(--mid) 50%);
+}
+
+/* 窄屏收成圆形按钮，只留圆点，避免挡住右下角的表单控件 */
+@media (max-width: 640px) {
+  .theme-float {
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    justify-content: center;
+    border-radius: 50%;
+  }
+
+  .theme-text,
+  .theme-suffix {
+    display: none;
+  }
+
+  .theme-dot {
+    width: 12px;
+    height: 12px;
+    /* 圆形按钮内只有圆点，去掉外边距才能水平居中 */
+    margin-right: 0;
+  }
+
+  /* 窄屏按钮收窄到 44px，页脚预留同步收窄，避免挤压版本号与署名 */
+  .footer-inner {
+    padding-right: 76px;
+  }
+
+  /* 后台无页脚，靠内容底部留白让「保存」等末行按钮滚出按钮覆盖范围 */
+  .admin-content {
+    padding-bottom: 88px;
+  }
 }
 
 .toast {
@@ -1217,6 +1270,15 @@ tbody tr:hover {
 .row-actions {
   display: flex;
   gap: 4px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* 窄容器里按钮会被压成竖排文字，禁止换行并保持原宽度 */
+.row-actions .btn,
+.admin-heading .btn {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .icon-btn {
@@ -1275,6 +1337,43 @@ tbody tr:hover {
   cursor: not-allowed;
 }
 
+/* 链接标识：输入框与「用标题生成」按钮同一行，窄屏自动换行 */
+.slug-field {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.slug-field input {
+  flex: 1 1 220px;
+  min-width: 0;
+  width: auto;
+}
+
+.field-note {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+/* 站点设置：备案号与推荐笔记之间的分组 */
+.settings-divider {
+  height: 1px;
+  background: var(--border);
+}
+
+.settings-group {
+  display: grid;
+  gap: 4px;
+}
+
+.settings-group strong {
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 650;
+}
+
 .editor-row {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1283,6 +1382,13 @@ tbody tr:hover {
 
 /* 窄屏三列会把日期控件的固有宽度挤出屏幕，改为单列并允许收缩。 */
 @media (max-width: 640px) {
+  /* 窄屏页头改为上下排列，标题与操作按钮不再互相挤压 */
+  .admin-heading {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
   .editor-row {
     grid-template-columns: 1fr;
   }
@@ -1435,7 +1541,7 @@ tbody tr:hover {
   .hero,
   .article,
   .login-shell {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: 36px;
   }
 
@@ -1519,7 +1625,8 @@ tbody tr:hover {
   }
 
   .admin-content {
-    padding: 18px;
+    /* 底部留白避开右下角固定主题按钮（44px + 20px 边距 + 余量） */
+    padding: 18px 18px 88px;
   }
 
   table {

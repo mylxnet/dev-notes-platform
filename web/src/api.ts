@@ -53,9 +53,23 @@ export interface PagedNotes {
   page_size: number
 }
 
-/** 站点公开信息，页脚备案号由这里提供。 */
+/** 首页推荐面板需要的笔记摘要，由后台「站点设置」维护。 */
+export interface FeaturedNote {
+  slug: string
+  title: string
+  published_at: string
+}
+
+/** 站点公开信息：页脚备案号 + 首页推荐笔记。 */
 export interface SiteInfo {
   icp_number: string
+  featured_notes?: FeaturedNote[]
+}
+
+/** 后台站点设置：备案号与推荐位 slug（按展示顺序）。 */
+export interface AdminSettings {
+  icp_number: string
+  featured_slugs: string[]
 }
 
 /** 后台项目列表与公开项目列表的分页响应。 */

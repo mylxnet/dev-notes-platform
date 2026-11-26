@@ -1,8 +1,8 @@
 # 技术方案 · 我的开发笔记
 
-> v1.4.7 · by Mr lin · 2026-11-25
+> v1.4.8 · by Mr lin · 2026-11-26
 >
-> 依据：`doc/DESIGN.md` v1.4.7、已确认的 `prototype/` 第一版界面。本文档是后续编码、测试、部署的实施依据，代码实现与本文档不一致时，以本文档评审结论为准。
+> 依据：`doc/DESIGN.md` v1.4.8、已确认的 `prototype/` 第一版界面。本文档是后续编码、测试、部署的实施依据，代码实现与本文档不一致时，以本文档评审结论为准。
 
 ## 一、方案目标与范围
 
@@ -141,6 +141,8 @@ dev-notes-platform/
 │       └── webui/             前端产物嵌入（embedui 构建标签）
 ├── web/                       Vue 前台（正式实现）
 │   ├── index.html
+│   ├── public/
+│   │   └── theme-init.js      首屏前定主题（外部文件，满足 CSP script-src 'self'）
 │   ├── package.json
 │   ├── vite.config.ts         产物输出到 app/internal/webui/dist
 │   ├── src/
@@ -158,8 +160,9 @@ dev-notes-platform/
 ├── tools/
 │   └── import-notes.sh        批量导入 content/notes 下的文章（幂等）
 ├── scripts/
-│   ├── build.sh               构建二进制与镜像
-│   └── package.sh             生成发布包
+│   ├── build.sh               构建前端 + embedui 静态二进制（正式包）
+│   ├── build-test.sh          测试包（登录页预填测试凭据）
+│   └── push-image.sh          构建并推送 amd64 镜像到阿里云
 └── test/
     ├── test_api.sh
     ├── test_security.sh
@@ -465,7 +468,7 @@ v1.3.0 实现位置：字段规则与词汇拦截在 `internal/validate`，渲�
 
 - 结构化 JSON 日志：`time`、`level`、`request_id`、`method`、`path`、`status`、`latency_ms`。
 - 不记录密码、Cookie、CSRF Token、完整请求体。
-- `GET /healthz` 返回 `{"status":"ok","db":"ok","version":"1.4.7"}`，数据库不可用时返回 503。
+- `GET /healthz` 返回 `{"status":"ok","db":"ok","version":"1.4.8"}`，数据库不可用时返回 503。
 
 ### 5.12 错误处理原则
 
@@ -687,7 +690,7 @@ services:
 |---|---|---|
 | 单元测试 | `go test ./...` | 校验器、slug、URL 白名单、词汇拦截、Markdown 净化、会话签名 |
 | 接口测试 | `httptest` + `test/test_api.sh` | 登录、CRUD、状态过滤、401、422、429 |
-| 浏览器测试 | Playwright CLI | 前台 6 页 + 后台 4 模块、主题、响应式、控制台 |
+| 浏览器测试 | Playwright CLI | 前台 6 页 + 后台 4 模块、主题、响应式、控制台；主题按钮断点回归见 `test/theme_button_check.py` |
 | 安全测试 | 手工 + 脚本 | XSS、SQL 注入、CSRF、Cookie 属性、越权 |
 | 部署测试 | Docker Compose | 启动、健康检查、重启持久化、备份恢复 |
 
@@ -754,7 +757,7 @@ services:
 | 封面图上传（v1.4.4） | 后台新建/编辑项目点「选择图片上传」，路径自动填入且缩略图出现；保存后前台卡片与详情页封面正常显示，无需重新打包 |
 | Markdown 编辑器（v1.4.5） | 工具栏按钮在光标处插入语法；输入后右侧实时预览；图片按钮上传后插入站内路径；三种视图模式与 390px 单列无横向溢出 |
 | 账号设置 | 密码长度、两次不一致、保存成功 |
-| 主题 | 浅色/暗色切换、刷新后保持 |
+| 主题 | 三态循环「跟随系统 → 浅色 → 深色」、刷新后保持；桌面端显示「浅色主题」长文案并有 `title` 提示；390px 为 44×44 圆形按钮、无文字、不压表单控件 |
 | 响应式 | 1440px、1024px、390px 无横向溢出 |
 | 控制台 | 0 错误、0 警告 |
 
@@ -904,6 +907,7 @@ ADMIN_PASSWORD=你的密码 MODE=update bash tools/import-notes.sh
 
 | 版本 | 日期 | 变更 |
 |---|---|---|
+| v1.4.8 | 2026-11-26 | 主题按钮窄屏收成 44px 圆形纯圆点、补 `title` 提示、后台窄屏留底部安全区；首屏主题脚本改为外部文件以符合生产 CSP；Vite 开轮询修复 WSL 不热更新 |
 | v1.4.7 | 2026-11-25 | 项目页改版：横向缩略图卡片、详情页图文并排、截图点击灯箱放大 |
 | v1.4.6 | 2026-11-17 | 补齐 Docker 构建链（多阶段 Dockerfile、Compose、阿里云推送脚本）并重写部署手册 |
 | v1.4.5 | 2026-11-17 | 笔记正文与项目说明接入自建 Markdown 编辑器（工具栏 + 实时分栏预览 + 图片上传），移除旧预览按钮 |

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
-import { createNote, getNote, listProjects, updateNote, type NoteInput } from '../../admin'
+import { createNote, getNote, listNotes, listProjects, updateNote, type NoteInput } from '../../admin'
+import { dedupeSlug, slugify } from '../../slug'
 import MarkdownEditor from '../../components/MarkdownEditor.vue'
 import {
   ApiError,
@@ -22,6 +23,10 @@ const loading = ref(isEdit.value)
 const saving = ref(false)
 const loaded = ref(!isEdit.value)
 const dirty = ref(false)
+/** 生成中的按钮状态，避免连点。 */
+const slugBusy = ref(false)
+/** 已占用的链接标识：新建时用于自动加后缀，取不到时交给后端唯一约束兜底。 */
+const takenSlugs = ref<string[]>([])
 
 const error = ref('')
 const success = ref('')
@@ -51,6 +56,36 @@ function toInput(): NoteInput {
   }
 }
 
+/** 新建时按标题生成链接标识；编辑已有笔记不自动改，避免已发布链接失效。 */
+async function generateSlug() {
+  if (isEdit.value || slugBusy.value) return
+  const title = form.value.title.trim()
+  if (!title) {
+    fieldError.value = { field: 'title', message: '先填写标题，再生成链接标识' }
+    return
+  }
+  slugBusy.value = true
+  try {
+    const base = await slugify(title)
+    if (!base) {
+      fieldError.value = { field: 'slug', message: '标题里没有可转成字母的内容，请手动填写链接标识' }
+      return
+    }
+    form.value.slug = dedupeSlug(base, takenSlugs.value)
+    if (fieldError.value?.field === 'slug' || fieldError.value?.field === 'title') fieldError.value = null
+  } catch {
+    fieldError.value = { field: 'slug', message: '生成失败，请手动填写链接标识' }
+  } finally {
+    slugBusy.value = false
+  }
+}
+
+/** 离开标题框补一次生成；只在新建、且标识仍为空时触发，手改过的不覆盖。 */
+function onTitleBlur() {
+  if (isEdit.value || form.value.slug.trim()) return
+  void generateSlug()
+}
+
 function validateLocally(): boolean {
   if (!form.value.title.trim() || form.value.title.trim().length > 120) {
     fieldError.value = { field: 'title', message: '标题需为 1–120 个字符' }
@@ -78,6 +113,10 @@ async function save() {
   error.value = ''
   success.value = ''
   fieldError.value = null
+  // 填完标题直接点保存时先补一次链接标识，避免被判成格式错误。
+  if (!isEdit.value && !form.value.slug.trim() && form.value.title.trim()) {
+    await generateSlug()
+  }
   if (!validateLocally()) return
 
   saving.value = true
@@ -116,12 +155,20 @@ watch(
 
 onMounted(async () => {
   try {
-    projects.value = (await listProjects()).items
+    // 一次取足量，既填满关联项目下拉，也备用于链接标识去重。
+    projects.value = (await listProjects({ pageSize: 100 })).items
   } catch {
     // 项目列表失败不阻塞编辑，关联项目可留空。
   }
 
-  if (!isEdit.value) return
+  if (!isEdit.value) {
+    try {
+      takenSlugs.value = (await listNotes({ pageSize: 100 })).items.map((item) => item.slug)
+    } catch {
+      // 拿不到已用标识就不做前端去重，保存时由唯一约束返回 409。
+    }
+    return
+  }
 
   try {
     const note = await getNote(noteId.value)
@@ -181,11 +228,28 @@ onBeforeRouteLeave(() => {
     <form v-else class="form-grid form-grid-wide" novalidate @submit.prevent="save">
       <label>
         标题
-        <input v-model="form.title" type="text" maxlength="120" placeholder="1–120 个字符" />
+        <input v-model="form.title" type="text" maxlength="120" placeholder="1–120 个字符" @blur="onTitleBlur" />
       </label>
       <label>
         链接标识（slug）
-        <input v-model="form.slug" type="text" placeholder="小写字母、数字与连字符，如 sqlite-pure-go-driver" />
+        <div class="slug-field">
+          <input
+            v-model="form.slug"
+            type="text"
+            maxlength="80"
+            placeholder="小写字母、数字与连字符，如 sqlite-pure-go-driver"
+          />
+          <button
+            v-if="!isEdit"
+            class="btn"
+            type="button"
+            :disabled="slugBusy || saving"
+            @click="generateSlug"
+          >
+            {{ slugBusy ? '生成中…' : '用标题生成' }}
+          </button>
+        </div>
+        <span v-if="!isEdit" class="field-note">离开标题框会自动填一次；手动改过就以你填的为准</span>
       </label>
       <label>
         摘要

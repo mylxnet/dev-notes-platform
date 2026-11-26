@@ -459,6 +459,89 @@ func TestSiteSettings(t *testing.T) {
 	}
 }
 
+// TestSiteFeaturedNotes 验证首页推荐位：顺序、去重、未发布拦截、超量与清空。
+func TestSiteFeaturedNotes(t *testing.T) {
+	router := newAdminTestServer(t)
+	cookies, csrf := login(t, router)
+
+	create := func(slug, title, status, publishedAt string) {
+		t.Helper()
+		payload := `{"title":"` + title + `","slug":"` + slug + `","summary":"摘要","content":"正文","status":"` +
+			status + `","published_at":"` + publishedAt + `"}`
+		rec := doJSON(t, router, http.MethodPost, "/api/admin/notes", payload, cookies, csrf)
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("create note %s failed: %d %s", slug, rec.Code, rec.Body.String())
+		}
+	}
+	create("featured-a", "推荐甲", "published", "2026-11-20T00:00:00Z")
+	create("featured-b", "推荐乙", "published", "2026-11-19T00:00:00Z")
+	create("featured-c", "推荐丙", "published", "2026-11-18T00:00:00Z")
+	create("featured-d", "推荐丁", "published", "2026-11-17T00:00:00Z")
+	create("featured-draft", "草稿戊", "draft", "")
+
+	// 默认未配置时公开接口返回空数组。
+	initial := doJSON(t, router, http.MethodGet, "/api/site", "", nil, "")
+	if !strings.Contains(initial.Body.String(), `"featured_notes":[]`) {
+		t.Fatalf("expected empty featured_notes, got %s", initial.Body.String())
+	}
+
+	// 顺序按传入顺序：先乙后甲。
+	saved := doJSON(t, router, http.MethodPut, "/api/admin/settings",
+		`{"icp_number":"","featured_slugs":["featured-b","featured-a"]}`, cookies, csrf)
+	if saved.Code != http.StatusOK || !strings.Contains(saved.Body.String(), `"featured_slugs":["featured-b","featured-a"]`) {
+		t.Fatalf("save featured failed: %d %s", saved.Code, saved.Body.String())
+	}
+	public := doJSON(t, router, http.MethodGet, "/api/site", "", nil, "")
+	body := public.Body.String()
+	idxB := strings.Index(body, `"slug":"featured-b"`)
+	idxA := strings.Index(body, `"slug":"featured-a"`)
+	if idxB < 0 || idxA < 0 || idxB > idxA {
+		t.Fatalf("expected featured-b before featured-a, got %s", body)
+	}
+	if !strings.Contains(body, `"title":"推荐乙"`) {
+		t.Fatalf("expected featured title in payload, got %s", body)
+	}
+
+	// 草稿不能进推荐位。
+	draft := doJSON(t, router, http.MethodPut, "/api/admin/settings",
+		`{"icp_number":"","featured_slugs":["featured-draft"]}`, cookies, csrf)
+	if draft.Code != http.StatusUnprocessableEntity || !strings.Contains(draft.Body.String(), "featured_slugs") {
+		t.Fatalf("expected 422 for draft featured note, got %d %s", draft.Code, draft.Body.String())
+	}
+
+	// 不存在的 slug 同样拦截。
+	missing := doJSON(t, router, http.MethodPut, "/api/admin/settings",
+		`{"icp_number":"","featured_slugs":["not-a-note"]}`, cookies, csrf)
+	if missing.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected 422 for missing note, got %d %s", missing.Code, missing.Body.String())
+	}
+
+	// 超过 3 篇拦截。
+	over := doJSON(t, router, http.MethodPut, "/api/admin/settings",
+		`{"icp_number":"","featured_slugs":["featured-a","featured-b","featured-c","featured-d"]}`, cookies, csrf)
+	if over.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected 422 for 4 featured notes, got %d %s", over.Code, over.Body.String())
+	}
+
+	// 重复项自动去重。
+	dedup := doJSON(t, router, http.MethodPut, "/api/admin/settings",
+		`{"icp_number":"","featured_slugs":["featured-a","featured-a",""]}`, cookies, csrf)
+	if dedup.Code != http.StatusOK || !strings.Contains(dedup.Body.String(), `"featured_slugs":["featured-a"]`) {
+		t.Fatalf("expected deduped slugs, got %d %s", dedup.Code, dedup.Body.String())
+	}
+
+	// 清空后公开接口恢复空数组。
+	cleared := doJSON(t, router, http.MethodPut, "/api/admin/settings",
+		`{"icp_number":"","featured_slugs":[]}`, cookies, csrf)
+	if cleared.Code != http.StatusOK {
+		t.Fatalf("expected 200 on clear, got %d %s", cleared.Code, cleared.Body.String())
+	}
+	public = doJSON(t, router, http.MethodGet, "/api/site", "", nil, "")
+	if !strings.Contains(public.Body.String(), `"featured_notes":[]`) {
+		t.Fatalf("expected empty after clear, got %s", public.Body.String())
+	}
+}
+
 func TestAdminLoginRateLimited(t *testing.T) {
 	router := newAdminTestServer(t)
 	for i := 0; i < 5; i++ {

@@ -6,6 +6,7 @@
 
 | 版本 | 日期 | 摘要 |
 |---|---|---|
+| v1.4.8 | 2026-11-26 | 主题按钮窄屏收成圆形不再压表单、补 title 提示；修复生产 CSP 拦掉首屏主题脚本、WSL 下 Vite 不热更新 |
 | v1.4.7 | 2026-11-25 | 项目页改版：横向缩略图卡片（contain 以高为准、居中留空）、详情页图文并排，图片不再放大 |
 | v1.4.6 | 2026-11-17 | 补齐 Docker 构建链：多阶段 Dockerfile、1Panel Compose、阿里云推送脚本，重写部署手册 |
 | v1.4.5 | 2026-11-17 | 笔记正文与项目说明接入带工具栏、实时分栏预览和图片上传的 Markdown 编辑器 |
@@ -42,6 +43,54 @@
 | v1.0.0 | 2026-11-17 | 初始设计方案 |
 
 ## 详细更新日志（按版本倒序）
+
+### v1.4.8 · 2026-11-26
+
+**新增**
+
+- 后台「新建笔记 / 新建项目」支持按标题（名称）生成链接标识：中文转无声调拼音（`pinyin-pro`，动态加载，不进前台首屏包）、全角字母数字转半角、超 80 字符回退到最后一个连字符处截断。
+- 生成的标识与已有内容重名时自动追加 `-2`、`-3`（已用标识由后台列表接口一次取 100 条，取不到时由数据库唯一约束返回 409 兜底）。
+- 「用标题生成 / 用名称生成」按钮只在新建时出现；编辑已有内容不自动改写标识，避免已发布链接失效。离开标题（名称）框时补一次生成，仅在标识仍为空时触发。
+- 首页右上角面板由「最近更新」改为「推荐笔记」：内容由后台「站点设置」的三个推荐位维护，存 `settings` 表的 `featured_notes` 键（slug 数组）；`/api/site` 校验「存在且已发布」后按顺序下发，最多 3 条，全空时首页隐藏该面板、hero 转单列，不再与下方「最近笔记」重复。
+- 主题支持「跟随系统 + 手动」双功能：浮动按钮点击循环「跟随系统 → 浅色 → 深色」，默认跟随系统并监听 `prefers-color-scheme` 实时切换；手动选择后记住并停止跟随，可再切回跟随系统。旧键 `dev-notes-theme` 自动迁移到新键 `dev-notes-theme-mode`。
+- 浮动主题按钮补 `title` 提示（「当前为浅色，点击切换」），悬停可看出当前模式与点击结果。
+
+**优化**
+
+- 窄屏（≤640px）主题按钮收成 44×44 圆形按钮，只保留状态圆点，不再显示文字，避免压住右下角的表单控件；桌面端仍显示「浅色主题」长文案。
+- 按钮内部去掉 flex `gap`，改为圆点单独留 8px 边距，桌面端文字连写为「浅色主题」，不再显示成「浅色 主题」。
+- 后台内容区在窄屏增加 88px 底部留白，滚到底时「保存」等末行按钮不会被固定主题按钮覆盖；页脚为按钮预留的右内边距同步从 132px 收到 76px。
+
+**修复**
+
+- 生产构建首屏主题初始化失效：`index.html` 的内联主题脚本被 CSP `script-src 'self'` 拦掉（控制台报「Executing inline script violates…」），首屏只能等 Vue 挂载后才切深色，出现浅色闪一下。改为独立文件 `web/public/theme-init.js`，用 `<script src>` 同步加载，既符合 CSP 又保持首屏前生效。
+- WSL 下改代码不生效：源码挂在 `/mnt/e`（Windows drvfs），inotify 事件传不到 WSL，Vite 仍返回旧编译结果（表现为改了模板但页面无变化、`title` 取不到）。在 `vite.config.ts` 开 `server.watch.usePolling`（间隔 300ms）解决。
+- 窄屏（≤640px）后台页头与按钮文字被压成竖排：`.admin-heading` 在 640px 以下改为纵向堆叠，`.btn` 加 `white-space: nowrap`，`.row-actions` 允许换行。
+
+**调整**
+
+- 版本升至 `v1.4.8`（`app/VERSION`、`app/main.go`、`web/package.json`、`web/package-lock.json`、`web/src/version.ts` 五处 + 文档同步）。
+- `deploy/docker-compose.yml` 镜像 tag 跟到 `1.4.8`，**该镜像尚未推送**，部署前需先执行 `scripts/push-image.sh`。
+
+**相关文件**
+
+- 新增 `web/src/slug.ts`、`web/public/theme-init.js`；改动 `AdminNoteEditView.vue`、`AdminProjectEditView.vue`、`ThemeSwitch.vue`、`styles.css`、`index.html`、`vite.config.ts`、`web/package.json`（新增 `pinyin-pro@^3.29.5` 依赖）。
+- 推荐笔记：后端 `app/internal/api/site.go`；前端 `HomeView.vue`、`AdminSettingsView.vue`、`api.ts`（`FeaturedNote` / `AdminSettings` 类型）、`admin.ts`、`site.ts`。
+- 交互原型 `prototype/slug-auto.html`、`prototype/featured-theme.html`（均离线可用），截图在 `prototype/screenshots/`。
+
+**验收证据（2026-11-26，无头 Chromium）**
+
+| 用例 | 实际结果 |
+|---|---|
+| 390px 按钮尺寸 / 圆角 | 44×44 / `50%` |
+| 390px 按钮文本 | 空（只有圆点），圆点水平居中偏差 0px |
+| 390px `title` | 「当前为跟随系统，点击切换」，点一次变「当前为浅色，点击切换」 |
+| 390px 点击后主题 | `data-theme="light"` |
+| 390px 七个页面滚到底遮挡（公开 3 页 + 后台 4 页） | 全部 `[]`，无控件被压；横向溢出 0px |
+| 1280px 按钮 | 100×40，长文案「浅色主题」可见，`title` 正常 |
+| 生产产物 CSP | 控制台报错 0（修复前 5 条内联脚本违规） |
+| 拦截业务 JS 后首屏主题 | `data-theme="dark"`，证明 `theme-init.js` 在 Vue 之前已生效 |
+| 二进制冒烟 | `/healthz` 返回 `{"db":"ok","status":"ok","version":"1.4.8"}` |
 
 ### v1.4.7 · 2026-11-25
 

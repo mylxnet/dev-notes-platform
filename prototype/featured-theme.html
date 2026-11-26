@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>推荐笔记 + 主题三态 · 交互原型</title>
+<style>
+  :root {
+    --bg: #faf9f5;
+    --surface: #ffffff;
+    --surface-2: #f2f0e8;
+    --text: #141413;
+    --muted: #6b6b63;
+    --mid: #b0aea5;
+    --border: #e8e6dc;
+    --accent: #d97757;
+    --accent-soft: rgba(217, 119, 87, 0.12);
+    --shadow: 0 18px 50px rgba(20, 20, 19, 0.08);
+  }
+  [data-theme='dark'] {
+    --bg: #141413;
+    --surface: #1e1e1c;
+    --surface-2: #262624;
+    --text: #f5f4ef;
+    --muted: #b0aea5;
+    --mid: #7c7b73;
+    --border: #33332f;
+    --accent: #e08a6c;
+    --accent-soft: rgba(224, 138, 108, 0.16);
+    --shadow: 0 18px 50px rgba(0, 0, 0, 0.4);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', system-ui, sans-serif;
+    line-height: 1.65; -webkit-font-smoothing: antialiased;
+    transition: background 0.2s ease, color 0.2s ease;
+  }
+  .proto-bar {
+    position: sticky; top: 0; z-index: 30;
+    background: color-mix(in srgb, var(--bg) 92%, transparent);
+    backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border);
+  }
+  .proto-inner {
+    width: min(100% - 48px, 1180px); margin-inline: auto;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; min-height: 62px; flex-wrap: wrap;
+  }
+  .proto-title { font-size: 0.92rem; font-weight: 650; }
+  .proto-title span { color: var(--muted); font-weight: 400; font-size: 0.82rem; margin-left: 8px; }
+  .seg { display: inline-flex; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 3px; gap: 2px; }
+  .seg button {
+    border: 0; background: transparent; padding: 5px 14px; border-radius: 999px;
+    font-size: 0.82rem; color: var(--muted); cursor: pointer; font-family: inherit;
+  }
+  .seg button.on { background: var(--accent); color: #fffaf3; }
+  .container { width: min(100% - 48px, 1180px); margin-inline: auto; }
+
+  /* ---------- 首页片段 ---------- */
+  .hero {
+    display: grid; grid-template-columns: 1.25fr 0.75fr;
+    gap: 64px; align-items: center; padding: 64px 0 40px;
+  }
+  .hero.solo { grid-template-columns: 1fr; gap: 0; }
+  .hero.solo .hero-panel { display: none; }
+  .eyebrow { font-size: 0.82rem; letter-spacing: 0.12em; color: var(--accent); text-transform: uppercase; margin-bottom: 14px; }
+  h1 { font-size: clamp(1.9rem, 3.4vw, 2.9rem); line-height: 1.25; margin: 0 0 18px; letter-spacing: -0.02em; }
+  .lead { color: var(--muted); font-size: 1.02rem; max-width: 46ch; margin: 0 0 26px; }
+  .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 10px 18px; border-radius: 999px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text); cursor: pointer;
+    font-size: 0.9rem; font-family: inherit; text-decoration: none; white-space: nowrap;
+  }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: #fffaf3; }
+  .hero-panel { border: 1px solid var(--border); border-radius: 24px; background: var(--surface); padding: 24px; box-shadow: var(--shadow); }
+  .panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 0.85rem; color: var(--muted); }
+  .panel-head strong { color: var(--text); font-weight: 650; font-size: 0.95rem; }
+  .link-more { color: var(--accent); font-size: 0.82rem; text-decoration: none; }
+  .panel-list { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .panel-item {
+    display: flex; justify-content: space-between; gap: 16px; padding: 14px 0;
+    border-bottom: 1px solid var(--border); font-size: 0.92rem; text-decoration: none; color: var(--text);
+  }
+  .panel-item:last-child { border-bottom: 0; padding-bottom: 0; }
+  .panel-item span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .panel-item span:last-child { color: var(--muted); font-size: 0.8rem; white-space: nowrap; }
+  .section { padding: 36px 0 56px; }
+  .section-head { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+  .section-title { font-size: 1.25rem; margin: 0; }
+  .section-subtitle { color: var(--muted); font-size: 0.88rem; }
+  .note-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .note-card { border: 1px solid var(--border); border-radius: 16px; background: var(--surface); padding: 18px; }
+  .note-card h3 { margin: 0 0 6px; font-size: 0.98rem; }
+  .note-card p { margin: 0; color: var(--muted); font-size: 0.86rem; }
+  .note-meta { margin-top: 12px; color: var(--mid); font-size: 0.78rem; }
+
+  /* ---------- 设置页片段 ---------- */
+  .settings-wrap { padding: 36px 0 56px; }
+  .settings-head { margin-bottom: 20px; }
+  .settings-head h1 { font-size: 1.5rem; margin: 0 0 6px; }
+  .settings-head p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+  .card { border: 1px solid var(--border); border-radius: 16px; background: var(--surface); padding: 24px; max-width: 620px; box-shadow: var(--shadow); }
+  .callout { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 10px 14px; border-radius: 8px; font-size: 0.85rem; color: var(--text); margin-bottom: 20px; }
+  .form-grid { display: grid; gap: 18px; }
+  label.field { display: grid; gap: 8px; color: var(--muted); font-size: 0.88rem; }
+  input[type="text"], select {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px;
+    background: var(--surface); color: var(--text); font: inherit; font-size: 0.9rem;
+  }
+  input[type="text"]:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .field-note { color: var(--muted); font-size: 0.78rem; }
+  .divider { height: 1px; background: var(--border); margin: 4px 0; }
+  .save-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .toast-inline { color: var(--accent); font-size: 0.84rem; }
+
+  /* ---------- 主题按钮 ---------- */
+  .theme-float {
+    position: fixed; right: 20px; bottom: 20px; z-index: 60;
+    display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px;
+    border-radius: 999px; border: 1px solid var(--border); background: var(--surface);
+    color: var(--muted); box-shadow: var(--shadow); cursor: pointer; font-size: 0.82rem;
+    font-family: inherit;
+  }
+  .theme-float:hover { transform: translateY(-2px); }
+  .theme-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
+  .theme-dot.system { background: linear-gradient(90deg, var(--accent) 50%, var(--mid) 50%); }
+
+  /* 模拟系统主题开关（仅原型演示用） */
+  .sys-sim { display: inline-flex; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--muted); }
+  .switch { position: relative; width: 38px; height: 22px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); cursor: pointer; }
+  .switch::after {
+    content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+    border-radius: 50%; background: var(--mid); transition: all 0.18s ease;
+  }
+  .switch.on::after { left: 18px; background: var(--accent); }
+
+  @media (max-width: 900px) {
+    .hero { grid-template-columns: minmax(0, 1fr); gap: 28px; padding: 40px 0 24px; }
+    .note-grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 640px) {
+    .proto-inner, .container { width: calc(100% - 28px); }
+    .card { padding: 18px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="proto-bar">
+  <div class="proto-inner">
+    <div class="proto-title">推荐笔记 + 主题三态<span>原型 · 待确认</span></div>
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+      <div class="sys-sim">
+        <span>模拟系统深色</span>
+        <div class="switch" id="sysSwitch" role="switch" aria-checked="false" tabindex="0"></div>
+      </div>
+      <div class="seg" id="tabs">
+        <button data-view="home" class="on">首页片段</button>
+        <button data-view="settings">站点设置</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 首页 -->
+<div id="view-home">
+  <section class="container hero" id="heroSection">
+    <div>
+      <div class="eyebrow">个人开发记录</div>
+      <h1>把写过的代码，<br />整理成能回看的笔记</h1>
+      <p class="lead">这里记录我在学习软件开发过程中的技术笔记、问题排查与项目复盘。</p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="#">浏览全部笔记</a>
+        <a class="btn" href="#">查看项目索引</a>
+      </div>
+    </div>
+    <aside class="hero-panel" id="heroPanel" aria-label="推荐笔记">
+      <div class="panel-head">
+        <strong>推荐笔记</strong>
+        <a href="#" class="link-more">全部</a>
+      </div>
+      <div class="panel-list" id="panelList"></div>
+    </aside>
+  </section>
+
+  <section class="container section">
+    <div class="section-head">
+      <div>
+        <h2 class="section-title">最近笔记</h2>
+        <div class="section-subtitle">按时间倒序，记录真实的排查过程与取舍</div>
+      </div>
+      <a href="#" class="link-more">全部笔记 →</a>
+    </div>
+    <div class="note-grid">
+      <article class="note-card">
+        <h3>脱敏做完了没有，得看解包后的 xlsx</h3>
+        <p>把交付物解包、逐表比对，才算真的确认脱敏生效。</p>
+        <div class="note-meta">2026-11-20 · 台账汇总器</div>
+      </article>
+      <article class="note-card">
+        <h3>HTTP Listener 到 TCP Listener 的迁移</h3>
+        <p>静态资源路径、重定向与代理头都要重新对齐。</p>
+        <div class="note-meta">2026-11-19 · SiteGuard</div>
+      </article>
+      <article class="note-card">
+        <h3>不可变账本只能冲销不能改</h3>
+        <p>借贷两边都要留痕，改一行就等于改历史。</p>
+        <div class="note-meta">2026-11-18 · 记账管理平台</div>
+      </article>
+      <article class="note-card">
+        <h3>SQLite 纯 Go 驱动踩坑记录</h3>
+        <p>并发写、时区与迁移顺序，一个不注意就报错。</p>
+        <div class="note-meta">2026-11-17 · 站点记录</div>
+      </article>
+    </div>
+  </section>
+
+  <section class="container" style="padding-bottom:48px;display:flex;gap:10px;flex-wrap:wrap">
+    <button class="btn" id="toggleEmpty" type="button">演示：清空推荐（面板隐藏）</button>
+    <span class="field-note" style="align-self:center">面板隐藏后，hero 改为单列，左侧文案自动占满；下方「最近笔记」不受影响。</span>
+  </section>
+</div>
+
+<!-- 设置页 -->
+<div id="view-settings" hidden>
+  <section class="container settings-wrap">
+    <div class="settings-head">
+      <h1>站点设置</h1>
+      <p>维护前台页脚备案号与首页推荐位；推荐位为空时首页不显示该面板。</p>
+    </div>
+    <div class="callout">推荐笔记只能从「已发布」的笔记中选，最多 3 篇，按推荐位 1→2→3 的顺序展示。</div>
+
+    <div class="card">
+      <div class="form-grid">
+        <label class="field">
+          ICP 备案号
+          <input type="text" value="甘ICP备12345678号-1" />
+          <span class="field-note">可留空；填写时限 5–100 位汉字、字母、数字或连字符。</span>
+        </label>
+
+        <div class="divider"></div>
+
+        <div style="display:grid;gap:14px">
+          <div>
+            <strong style="font-size:0.92rem">推荐笔记</strong>
+            <div class="field-note" style="margin-top:2px">选择要出现在首页右上角面板的笔记；留空位即少展示，全空则整块面板隐藏。</div>
+          </div>
+          <label class="field">
+            推荐位 1
+            <select class="slot" data-slot="0"></select>
+          </label>
+          <label class="field">
+            推荐位 2
+            <select class="slot" data-slot="1"></select>
+          </label>
+          <label class="field">
+            推荐位 3
+            <select class="slot" data-slot="2"></select>
+          </label>
+          <span class="field-note">选项来自已发布笔记，按发布时间倒序；同一篇不能重复选，选了会自动从其它推荐位移除。</span>
+        </div>
+
+        <div class="save-row">
+          <button class="btn btn-primary" type="button" id="saveBtn">保存设置</button>
+          <span class="toast-inline" id="saveHint"></span>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<button class="theme-float" id="themeBtn" type="button" aria-label="切换主题">
+  <span class="theme-dot system" id="themeDot"></span>
+  <span id="themeLabel">跟随系统</span>
+  <span>主题</span>
+</button>
+
+<script>
+(function () {
+  'use strict';
+
+  var NOTES = [
+    { slug: 'desensitize-proof-by-unzip', title: '脱敏做完了没有，得看解包后的 xlsx', date: '2026-11-20' },
+    { slug: 'http-listener-to-tcplistener', title: 'HTTP Listener 到 TCP Listener 的迁移', date: '2026-11-19' },
+    { slug: 'immutable-ledger-void-only', title: '不可变账本只能冲销不能改', date: '2026-11-18' },
+    { slug: 'sqlite-pure-go-driver', title: 'SQLite 纯 Go 驱动踩坑记录', date: '2026-11-17' },
+    { slug: 'imap-uid-range-star-trap', title: 'IMAP UID 区间里的星号陷阱', date: '2026-11-16' }
+  ];
+
+  // 推荐位状态：空串表示未设置
+  var slots = ['immutable-ledger-void-only', 'http-listener-to-tcplistener', ''];
+
+  /* ---------------- 主题三态 ---------------- */
+  var THEME_KEY = 'dev-notes-theme-mode';
+  var modes = ['system', 'light', 'dark'];
+  var mode = localStorage.getItem(THEME_KEY);
+  if (modes.indexOf(mode) === -1) mode = 'system';
+
+  var sysDark = false; // 原型用开关模拟系统偏好；真实实现读 matchMedia
+
+  function resolved() {
+    if (mode === 'system') return sysDark ? 'dark' : 'light';
+    return mode;
+  }
+
+  function applyTheme() {
+    document.documentElement.dataset.theme = resolved();
+    var label = mode === 'system' ? '跟随系统' : mode === 'light' ? '浅色' : '深色';
+    document.getElementById('themeLabel').textContent = label;
+    document.getElementById('themeDot').className = 'theme-dot' + (mode === 'system' ? ' system' : '');
+    document.getElementById('themeBtn').setAttribute('aria-label', '当前为' + label + '，点击切换');
+  }
+
+  document.getElementById('themeBtn').addEventListener('click', function () {
+    mode = modes[(modes.indexOf(mode) + 1) % modes.length];
+    localStorage.setItem(THEME_KEY, mode);
+    applyTheme();
+  });
+
+  var sysSwitch = document.getElementById('sysSwitch');
+  sysSwitch.addEventListener('click', function () {
+    sysDark = !sysDark;
+    sysSwitch.classList.toggle('on', sysDark);
+    sysSwitch.setAttribute('aria-checked', sysDark ? 'true' : 'false');
+    if (mode === 'system') applyTheme();
+  });
+
+  /* ---------------- 首页推荐面板 ---------------- */
+  var panelItems = function () {
+    return slots
+      .map(function (slug) { return NOTES.find(function (n) { return n.slug === slug; }); })
+      .filter(Boolean);
+  };
+
+  function renderPanel() {
+    var list = document.getElementById('panelList');
+    var items = panelItems();
+    list.innerHTML = '';
+    items.forEach(function (note) {
+      var a = document.createElement('a');
+      a.className = 'panel-item';
+      a.href = '#';
+      var t = document.createElement('span');
+      t.textContent = note.title;
+      var d = document.createElement('span');
+      d.textContent = note.date;
+      a.appendChild(t);
+      a.appendChild(d);
+      list.appendChild(a);
+    });
+    document.getElementById('heroSection').classList.toggle('solo', items.length === 0);
+    document.getElementById('toggleEmpty').textContent = items.length
+      ? '演示：清空推荐（面板隐藏）'
+      : '演示：恢复 2 条推荐';
+  }
+
+  document.getElementById('toggleEmpty').addEventListener('click', function () {
+    slots = panelItems().length ? ['', '', ''] : ['immutable-ledger-void-only', 'http-listener-to-tcplistener', ''];
+    renderPanel();
+    renderSelects();
+  });
+
+  /* ---------------- 设置页下拉 ---------------- */
+  function renderSelects() {
+    document.querySelectorAll('.slot').forEach(function (sel) {
+      var index = Number(sel.dataset.slot);
+      sel.innerHTML = '';
+      var empty = document.createElement('option');
+      empty.value = '';
+      empty.textContent = '（不设置）';
+      sel.appendChild(empty);
+      NOTES.forEach(function (note) {
+        if (slots.indexOf(note.slug) !== -1 && slots[index] !== note.slug) return;
+        var opt = document.createElement('option');
+        opt.value = note.slug;
+        opt.textContent = note.title + ' · ' + note.date;
+        sel.appendChild(opt);
+      });
+      sel.value = slots[index] || '';
+    });
+  }
+
+  document.querySelectorAll('.slot').forEach(function (sel) {
+    sel.addEventListener('change', function () {
+      var index = Number(sel.dataset.slot);
+      var value = sel.value;
+      if (value) slots = slots.map(function (s) { return s === value ? '' : s; });
+      slots[index] = value;
+      renderSelects();
+      renderPanel();
+      document.getElementById('saveHint').textContent = '';
+    });
+  });
+
+  document.getElementById('saveBtn').addEventListener('click', function () {
+    var count = slots.filter(Boolean).length;
+    document.getElementById('saveHint').textContent = count
+      ? '已保存：首页展示 ' + count + ' 条推荐'
+      : '已保存：推荐位为空，首页隐藏该面板';
+    renderPanel();
+  });
+
+  /* ---------------- 页签 ---------------- */
+  document.getElementById('tabs').addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-view]');
+    if (!btn) return;
+    document.querySelectorAll('#tabs button').forEach(function (b) { b.classList.toggle('on', b === btn); });
+    var view = btn.dataset.view;
+    document.getElementById('view-home').hidden = view !== 'home';
+    document.getElementById('view-settings').hidden = view !== 'settings';
+  });
+
+  applyTheme();
+  renderPanel();
+  renderSelects();
+})();
+</script>
+</body>
+</html>

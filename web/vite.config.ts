@@ -12,6 +12,9 @@ export default defineConfig({
     chunkSizeWarningLimit: 800
   },
   server: {
+    // 源码位于 /mnt/e（Windows drvfs 挂载），inotify 事件不会传递到 WSL，
+    // 不开启轮询会导致改完代码 Vite 仍返回旧编译结果。轮询间隔取 300ms 折中 CPU 占用。
+    watch: { usePolling: true, interval: 300 },
     proxy: {
       '/api': {
         target: 'http://127.0.0.1:8080',

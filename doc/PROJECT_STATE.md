@@ -1,12 +1,37 @@
 # 项目状态 · 我的开发笔记
 
-> v1.4.7 · by Mr lin · 2026-11-25
+> v1.4.8 · by Mr lin · 2026-11-26
 
 ## 当前版本
 
-v1.4.7 · Section 3 已完成，Section 4 进行中：8 个项目共 31 篇，全部为真实技术复盘。数据库结构版本 `schemaVersion = 3`（新增 `settings` 表）。Section 5 部署：Docker 构建链就绪，`1.4.7` 镜像已推送阿里云并通过容器端到端冒烟；1Panel 上机待 ICP 备案通过。
+v1.4.8 · Section 3 已完成，Section 4 进行中：8 个项目共 31 篇，全部为真实技术复盘。数据库结构版本 `schemaVersion = 3`（新增 `settings` 表）。Section 5 部署：Docker 构建链就绪，`1.4.7` 镜像已推送阿里云并通过容器端到端冒烟，`1.4.8` 镜像**尚未推送**；1Panel 上机待 ICP 备案通过。
 
-**当前 `app/build/dev-notes` 是 `bash scripts/build.sh` 产出的正式包**（v1.4.7，明文凭据计数 0，可对外发）：需要一键登录的本机验收包用 `scripts/build-test.sh` 单独产出（计数 1），用完覆盖回正式包，测试包不得外发。本机验收数据用 `deploy/data` 的副本（WSL 重启会清空 `/tmp`，原来的 `/tmp/dn-dev` 已不可靠）。
+**当前 `app/build/dev-notes` 是 `bash scripts/build.sh` 产出的正式包**（v1.4.8，明文凭据计数 0，可对外发）：需要一键登录的本机验收包用 `scripts/build-test.sh` 单独产出（计数 1），用完覆盖回正式包，测试包不得外发。本机验收数据用 `deploy/data` 的副本（WSL 重启会清空 `/tmp`，原来的 `/tmp/dn-dev` 已不可靠）。
+
+## 本轮改动记录（v1.4.8，2026-11-26）
+
+- 主题按钮重做：桌面端保留「浅色主题」长文案并补 `title` 提示；≤640px 收成 44×44 圆形按钮、只留状态圆点，桌面/窄屏都不再压住右下角表单控件。
+- 主题改为三态：跟随系统（默认，监听 `prefers-color-scheme`）/ 浅色 / 深色，点击浮动按钮循环切换；旧键 `dev-notes-theme` 迁移到 `dev-notes-theme-mode`。
+- 首屏主题初始化脚本从 `index.html` 内联迁到 `web/public/theme-init.js`（生产 CSP `script-src 'self'` 会拦内联脚本）。
+- 后台内容区窄屏增加 88px 底部留白，页脚为按钮预留的右内边距从 132px 收到 76px；`vite.config.ts` 开启 `server.watch.usePolling`。
+- 后台新建笔记/项目支持「用标题（名称）生成」链接标识，编辑页不自动改写；新增 `web/src/slug.ts`，依赖 `pinyin-pro`（动态 import，只进后台编辑页 chunk）。
+- 首页右上角面板改为「推荐笔记」：后台站点设置三个推荐位（存 `settings.featured_notes`），`/api/site` 只下发存在且已发布的笔记，最多 3 条；全部为空时首页隐藏面板、hero 转单列。
+- 修复既有的窄屏问题：≤640px 时后台页头按钮被压成竖排文字（`.admin-heading` 改纵向堆叠、按钮 `white-space: nowrap`、`.row-actions` 允许换行）。
+- 本轮已执行 `bash scripts/build.sh` 打包，`app/build/dev-notes` 为 v1.4.8 正式包；镜像未推送。
+
+### 验收证据（v1.4.8，2026-11-26）
+
+- 无头 Chromium（390×900 / 1280×900）跑 `verify_theme_btn.py`：390px 按钮 44×44、`border-radius: 50%`、文本长度 0、圆点居中偏差 0px、`title` =「当前为跟随系统，点击切换」；点一次后 `title` 变「当前为浅色，点击切换」、`data-theme="light"`。
+- 遮挡检查（滚到底、真实矩形相交）：公开 `/`、`/projects`、`/about` 与后台 `/admin/notes`、`/admin/notes/new`、`/admin/projects`、`/admin/settings`、`/admin/account` 全部 `[]`，横向溢出 0px。
+- 1280px：按钮 100×40，长文案「浅色主题」可见，`title` 正常。
+- 生产产物（`app/build/dev-notes` 起在 `:18080`，挂 `deploy/data` 副本）：`/healthz` 返回 `{"db":"ok","status":"ok","version":"1.4.8"}`；控制台报错 0（修复前有 5 条内联脚本 CSP 违规）；拦截业务 JS 后 `data-theme` 仍为 `dark`，证明 `theme-init.js` 在 Vue 挂载前生效；下发 CSS 中 `theme-short` 出现 0 次、含 `width:44px;height:44px;…border-radius:50%` 与 `padding:18px 18px 88px`。
+- 构建：`bash scripts/build.sh` 版本一致性校验通过（`1.4.8` 五处一致），`vite build` 3.59s，后端 `-tags embedui` 静态编译，产物 27.8 MB。
+
+### 本轮踩坑（v1.4.8）
+
+- **Vite 在 WSL 下不热更新**：现象是改完 `ThemeSwitch.vue` 模板后，浏览器仍拿到旧组件（`title` 取不到、仍是 `theme-short`），但文件内容已是新版。根因：源码在 `/mnt/e`（Windows drvfs 挂载），inotify 事件不会传进 WSL，Vite 的 watcher 收不到变更，继续返回缓存的 transform 结果。定位方式：直接 `curl http://127.0.0.1:5173/src/components/ThemeSwitch.vue` 看服务端返回的模块，发现仍是旧代码。修复：`vite.config.ts` 加 `server.watch.usePolling: true, interval: 300`。教训：在 `/mnt/` 下开发必须开轮询，否则「改了没生效」会误判成代码问题；同时避免同时留多个 vite 进程抢同一端口。
+- **生产 CSP 拦掉内联主题脚本**：现象是正式包里控制台报 `Executing inline script violates the following Content Security Policy directive 'script-src 'self''`，首屏防闪烁失效。根因：`app/internal/api/router.go` 的 `securityHeaders()` 只放行 `script-src 'self'`，而 `index.html` 用的是内联 `<script>`。修复：脚本迁到 `web/public/theme-init.js`，用 `<script src="/theme-init.js">` 同步加载（`public/` 下的文件不带哈希、不享长缓存，改完即时生效）。教训：Vite 的 `index.html` 内联脚本在 dev 下正常、生产被 CSP 拦，验收必须对**构建产物**再跑一遍，不能只测 dev server。
+- **遮挡指标要用真实矩形相交**：最初只比较水平区间，得出「按钮覆盖下拉 327px」的假结论（实际垂直方向根本不相交）。改为按矩形交面积计算后，才暴露出真实问题是滚到底时压住「保存」主按钮（444px²），据此补了底部留白。
 
 ## 本轮改动记录（v1.4.7，2026-11-25）
 
@@ -589,7 +614,7 @@ v1.4.7 · Section 3 已完成，Section 4 进行中：8 个项目共 31 篇，�
 4. `mailhub-imap-cursor.svg` 仍未在任何文章中被引用（`siteguard-origin.svg` 已随 `reverse-proxy-origin-403` 上线）；本轮 3 篇纯文字，没有插图
 5. `tools/import-notes.sh` 目前只处理新建与更新，未做正文配图上传（插图仍走 `web/public/media/`）
 6. 项目元数据（名称/摘要/技术栈/说明/封面路径）只存在于数据库，重建开发库要手工补录；考虑加一份 `content/projects.json` + 入库脚本，避免下次重来
-7. Section 5：Docker 构建链已就绪，`1.4.6` / `1.4.7` 镜像均在阿里云，`1.4.7` 已通过云端容器冒烟；待办是 1Panel 上机部署与浏览器验收（需 ICP 备案通过后再开放）
+7. Section 5：Docker 构建链已就绪，`1.4.6` / `1.4.7` 镜像均在阿里云，`1.4.7` 已通过云端容器冒烟；`1.4.8` 只出了本地二进制，**镜像待推送**。待办是 1Panel 上机部署与浏览器验收（需 ICP 备案通过后再开放）
 8. 每个 Section 完成后升小版本、同步文档并提交
 
 ## 版本一致性检查
@@ -598,11 +623,11 @@ v1.4.7 · Section 3 已完成，Section 4 进行中：8 个项目共 31 篇，�
 
 | 位置 | 当前值 |
 |---|---|
-| `app/VERSION` / `app/main.go` | `1.4.7` |
-| `web/package.json` / `web/package-lock.json` | `1.4.7` |
-| `web/src/version.ts` | `APP_VERSION = '1.4.7'` |
-| `web/src/views/AboutView.vue` / 后台侧栏 / 登录页 | `{{ VERSION_LINE }}` → `v1.4.7 by Mr lin` |
-| `doc/*.md` / `README.md` / `CHANGELOG.md` / `deploy/docker-compose.yml` 镜像 tag | `v1.4.7` |
+| `app/VERSION` / `app/main.go` | `1.4.8` |
+| `web/package.json` / `web/package-lock.json` | `1.4.8` |
+| `web/src/version.ts` | `APP_VERSION = '1.4.8'` |
+| `web/src/views/AboutView.vue` / 后台侧栏 / 登录页 | `{{ VERSION_LINE }}` → `v1.4.8 by Mr lin` |
+| `doc/*.md` / `README.md` / `CHANGELOG.md` / `deploy/docker-compose.yml` 镜像 tag | `v1.4.8` |
 
 `scripts/build.sh` 在编译前校验 `app/main.go` 的 `var version` 与 `app/VERSION` 一致，不一致直接失败。原型工程 `prototype/` 仍为 `v1.0.3`，作为冻结基线不再跟随版本。
 
@@ -626,6 +651,10 @@ cd web && npm run dev          # Vite 已把 /api 代理到 127.0.0.1:8080
 # 启动已打包的二进制做验收：挂 deploy/data 的副本
 DATA_DIR=/mnt/e/app/网站备案/dev-notes-platform/deploy/data HTTP_ADDR=:18091 \
   SESSION_SECRET=0123456789abcdef0123456789abcdef ./app/build/dev-notes
+
+# 主题按钮断点回归（WSL 内 playwright + chromium，输出 JSON）
+BASE=http://127.0.0.1:5173 ADMIN_USER=admin ADMIN_PASS=<当前密码> \
+  python3 test/theme_button_check.py
 ```
 
 `DATA_DIR` 决定看到哪份内容：验收用的真实开发库副本在 `deploy/data`（`notes.db` + `media/`，8 个项目 / 31 篇笔记）；临时库（如 `deploy/data-login`）只有造数数据。**WSL 重启会清空 `/tmp`，原先的 `/tmp/dn-dev` 已不再使用。**重启前先确认旧服务挂载的目录，不要直接换新目录，否则会表现为「笔记和项目找不到」。管理员密码若在后台改过，测试包预填的默认密码会失效，需用当前密码登录或重建测试包时通过 `VITE_TEST_PASSWORD` 注入。**2026-11-17 已按用户同意把真实库密码重置为默认测试密码，测试包预填可直接登录。** 运行时上传的图片写入 `DATA_DIR/media/`，备份时要一并带上；构建产物 `web/public/media/` 里的预置图仍随二进制发布。

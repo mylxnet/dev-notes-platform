@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import NoteCard from '../components/NoteCard.vue'
 import EmptyState from '../components/EmptyState.vue'
 import {
@@ -12,8 +12,10 @@ import {
   type Note,
   type Project
 } from '../api'
+import { loadSiteInfo, siteFeaturedNotes } from '../site'
 
-const panelNotes = ref<Note[]>([])
+/** 右上角面板改为后台维护的推荐笔记，不再重复下方的「最近笔记」。 */
+const featuredNotes = computed(() => siteFeaturedNotes.value)
 const recentNotes = ref<Note[]>([])
 const indexProjects = ref<Project[]>([])
 /** 已公开项目总数：首页只展示前两个，数字要取全量。 */
@@ -25,18 +27,18 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
+    // 推荐位来自 /api/site，与页脚备案号同一份共享状态；已加载过会直接返回。
+    await loadSiteInfo()
     const [notesResult, projectsResult] = await Promise.all([
       fetchNotes({ pageSize: 4 }),
       fetchProjects()
     ])
     recentNotes.value = notesResult.items
-    panelNotes.value = notesResult.items.slice(0, 3)
     indexProjects.value = projectsResult.items.slice(0, 2)
     projectTotal.value = projectsResult.total
   } catch (err) {
     error.value = errorMessageOf(err)
     recentNotes.value = []
-    panelNotes.value = []
     indexProjects.value = []
     projectTotal.value = 0
   } finally {
@@ -54,7 +56,7 @@ function initialOf(name: string): string {
 
 <template>
   <div>
-    <section class="container hero">
+    <section class="container hero" :class="{ solo: !loading && !featuredNotes.length }">
       <div>
         <div class="eyebrow">个人开发记录</div>
         <h1>把写过的代码，<br />整理成能回看的笔记</h1>
@@ -66,9 +68,9 @@ function initialOf(name: string): string {
           <RouterLink to="/projects" class="btn">查看项目索引</RouterLink>
         </div>
       </div>
-      <aside class="hero-panel" aria-label="最近更新">
+      <aside v-if="loading || featuredNotes.length" class="hero-panel" aria-label="推荐笔记">
         <div class="panel-head">
-          <strong>最近更新</strong>
+          <strong>推荐笔记</strong>
           <RouterLink to="/notes" class="link-more">全部</RouterLink>
         </div>
         <div class="panel-list">
@@ -78,15 +80,17 @@ function initialOf(name: string): string {
               <span class="skeleton-line" style="width: 28%; margin: 0" />
             </div>
           </template>
-          <template v-else-if="panelNotes.length">
-            <RouterLink v-for="note in panelNotes" :key="note.id" :to="`/notes/${note.slug}`" class="panel-item">
+          <template v-else>
+            <RouterLink
+              v-for="note in featuredNotes"
+              :key="note.slug"
+              :to="`/notes/${note.slug}`"
+              class="panel-item"
+            >
               <span>{{ note.title }}</span>
               <span>{{ formatDate(note.published_at) }}</span>
             </RouterLink>
           </template>
-          <div v-else class="panel-item">
-            <span>暂无已发布笔记</span>
-          </div>
         </div>
       </aside>
     </section>

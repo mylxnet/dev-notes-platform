@@ -1,0 +1,521 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>笔记 slug 自动生成 · 交互原型</title>
+<style>
+  :root {
+    --bg: #faf9f5;
+    --surface: #ffffff;
+    --surface-2: #f5f3ec;
+    --text: #141413;
+    --muted: #6b6b63;
+    --mid: #b0aea5;
+    --border: #e8e6dc;
+    --accent: #d97757;
+    --accent-soft: rgba(217, 119, 87, 0.12);
+    --green: #5f7449;
+    --green-soft: rgba(120, 140, 93, 0.16);
+    --amber: #a8762a;
+    --amber-soft: rgba(168, 118, 42, 0.14);
+    --shadow: 0 18px 50px rgba(20, 20, 19, 0.06);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', system-ui, sans-serif;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    padding-bottom: 64px;
+  }
+  .proto-bar {
+    position: sticky; top: 0; z-index: 20;
+    background: color-mix(in srgb, var(--bg) 92%, transparent);
+    backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border);
+  }
+  .proto-inner {
+    width: min(100% - 48px, 1080px); margin-inline: auto;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; min-height: 60px; flex-wrap: wrap;
+  }
+  .proto-title { font-size: 0.92rem; font-weight: 650; }
+  .proto-title span { color: var(--muted); font-weight: 400; margin-left: 8px; font-size: 0.84rem; }
+  .proto-tag {
+    font-size: 0.76rem; padding: 3px 10px; border-radius: 999px;
+    background: var(--amber-soft); color: var(--amber); border: 1px solid transparent;
+  }
+  .wrap { width: min(100% - 48px, 1080px); margin: 28px auto 0; display: grid; gap: 20px; }
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; box-shadow: var(--shadow); overflow: hidden;
+  }
+  .card-head {
+    padding: 16px 22px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+    background: linear-gradient(180deg, #fff, #fcfbf7);
+  }
+  .card-head h2 { margin: 0; font-size: 0.98rem; font-weight: 650; }
+  .card-body { padding: 22px; display: grid; gap: 20px; }
+
+  /* ---------- 场景切换 ---------- */
+  .scenario {
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    padding: 10px 14px; background: var(--surface-2);
+    border-radius: 10px; font-size: 0.84rem; color: var(--muted);
+  }
+  .seg { display: inline-flex; background: #fff; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .seg button {
+    border: 0; background: transparent; padding: 6px 14px; font-size: 0.82rem;
+    color: var(--muted); cursor: pointer; font-family: inherit;
+  }
+  .seg button.on { background: var(--accent); color: #fff; }
+
+  /* ---------- 表单 ---------- */
+  label.field { display: grid; gap: 6px; }
+  .field-label { font-size: 0.82rem; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+  .field-label .req { color: var(--accent); }
+  input[type="text"], textarea {
+    width: 100%; font-family: inherit; font-size: 0.92rem; color: var(--text);
+    padding: 10px 12px; border: 1px solid var(--border); border-radius: 9px;
+    background: #fff; outline: none; transition: border-color .15s, box-shadow .15s;
+  }
+  input[type="text"]:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  textarea { resize: vertical; min-height: 70px; }
+
+  .slug-row { display: flex; align-items: stretch; gap: 0; }
+  .slug-prefix {
+    display: inline-flex; align-items: center; padding: 0 12px;
+    background: var(--surface-2); border: 1px solid var(--border); border-right: 0;
+    border-radius: 9px 0 0 9px; color: var(--muted); font-size: 0.86rem;
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  }
+  .slug-row input { border-radius: 0 9px 9px 0; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+  .slug-row.dirty input { border-color: var(--accent); }
+
+  .hint-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 0.8rem; color: var(--muted); }
+  .tag {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 2px 9px; border-radius: 999px; font-size: 0.76rem; border: 1px solid transparent;
+  }
+  .tag.auto { background: var(--green-soft); color: var(--green); }
+  .tag.manual { background: var(--accent-soft); color: var(--accent); }
+  .tag.warn { background: var(--amber-soft); color: var(--amber); }
+  .tag.quiet { background: var(--surface-2); color: var(--muted); }
+
+  .btn {
+    font-family: inherit; font-size: 0.84rem; padding: 8px 14px; border-radius: 8px;
+    border: 1px solid var(--border); background: #fff; color: var(--text);
+    cursor: pointer; transition: background .15s, border-color .15s, color .15s;
+  }
+  .btn:hover { border-color: var(--mid); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.primary:hover { filter: brightness(0.96); }
+  .btn.ghost { background: transparent; color: var(--muted); }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  /* ---------- 生成过程 ---------- */
+  .steps { display: grid; gap: 10px; }
+  .step {
+    display: grid; grid-template-columns: 68px 1fr; gap: 12px;
+    padding: 10px 12px; background: var(--surface-2); border-radius: 9px;
+    font-size: 0.82rem; align-items: start;
+  }
+  .step b { color: var(--muted); font-weight: 500; font-size: 0.78rem; }
+  .step code {
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: 0.82rem; word-break: break-all; color: var(--text);
+  }
+  .step code .sep { color: var(--accent); }
+
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip {
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: 0.76rem; padding: 2px 8px; border-radius: 6px;
+    background: #fff; border: 1px solid var(--border); color: var(--muted);
+  }
+  .chip.hit { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+
+  .note-list { display: flex; gap: 8px; flex-wrap: wrap; }
+  .note-list .chip { cursor: default; }
+
+  .rules { font-size: 0.84rem; color: var(--muted); display: grid; gap: 8px; }
+  .rules li { margin-left: -8px; }
+  ul { margin: 0; padding-left: 20px; }
+  .kbd {
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 0.78rem;
+    background: #fff; border: 1px solid var(--border); border-bottom-width: 2px;
+    padding: 0 5px; border-radius: 5px; color: var(--text);
+  }
+  .toast {
+    position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 20px);
+    background: #141413; color: #fff; padding: 10px 18px; border-radius: 10px;
+    font-size: 0.84rem; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s;
+    z-index: 50; max-width: min(90vw, 520px);
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+  @media (max-width: 640px) {
+    .proto-inner, .wrap { width: calc(100% - 28px); }
+    .step { grid-template-columns: 1fr; gap: 4px; }
+    .card-body { padding: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="proto-bar">
+  <div class="proto-inner">
+    <div class="proto-title">笔记 slug 自动生成<span>方案 A · 前端拼音生成 · 交互原型</span></div>
+    <div class="proto-tag">待确认 · by Mr lin</div>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <section class="card">
+    <div class="card-head">
+      <h2>新增笔记（表单片段）</h2>
+      <div class="scenario">
+        <span>场景</span>
+        <div class="seg" id="seg">
+          <button data-mode="create" class="on">新增笔记</button>
+          <button data-mode="edit">编辑已有笔记</button>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+
+      <label class="field">
+        <span class="field-label">标题 <span class="req">*</span></span>
+        <input id="title" type="text" maxlength="120" placeholder="例如：SQLite 纯 Go 驱动踩坑记录" />
+        <div class="btn-row" style="margin-top:2px">
+          <button class="btn ghost" data-sample="SQLite 纯 Go 驱动踩坑记录">示例：SQLite 纯 Go 驱动踩坑记录</button>
+          <button class="btn ghost" data-sample="前端 路由 401 分流">示例：前端 路由 401 分流</button>
+          <button class="btn ghost" data-sample="Windows 下 WSL 重启后 /tmp 被清空">示例：含符号与英文</button>
+        </div>
+      </label>
+
+      <label class="field">
+        <span class="field-label">
+          链接标识（slug） <span class="req">*</span>
+          <span id="slugState" class="tag quiet">待输入标题</span>
+        </span>
+        <div class="slug-row" id="slugRow">
+          <span class="slug-prefix">/notes/</span>
+          <input id="slug" type="text" maxlength="80" placeholder="小写字母、数字与连字符" spellcheck="false" />
+        </div>
+        <div class="hint-row">
+          <span id="slugHint">长度 2–80，只能是小写字母、数字、连字符</span>
+          <span><span id="slugLen">0</span>/80</span>
+        </div>
+      </label>
+
+      <div class="btn-row">
+        <button class="btn primary" id="genBtn">用标题生成</button>
+        <button class="btn" id="resetBtn">清空重来</button>
+        <button class="btn ghost" id="copyBtn">复制完整链接</button>
+      </div>
+
+      <label class="field">
+        <span class="field-label">摘要</span>
+        <textarea rows="2" maxlength="300" placeholder="1–300 个字符，用于列表展示（本原型不参与逻辑）"></textarea>
+      </label>
+
+      <div class="btn-row">
+        <button class="btn" id="saveBtn">保存草稿</button>
+        <button class="btn primary" id="publishBtn">发布</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h2>生成过程</h2><span class="hint-row">中文逐字转无声调拼音，英文与数字整段保留</span></div>
+    <div class="card-body">
+      <div class="steps">
+        <div class="step"><b>① 原始标题</b><code id="s1">—</code></div>
+        <div class="step"><b>② 分词结果</b><div class="chips" id="s2"><span class="chip">—</span></div></div>
+        <div class="step"><b>③ 归并</b><code id="s3">—</code></div>
+        <div class="step"><b>④ 清洗</b><code id="s4">—</code></div>
+        <div class="step"><b>⑤ 冲突处理</b><code id="s5">—</code></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h2>规则与实现约定</h2></div>
+    <div class="card-body">
+      <ul class="rules">
+        <li>slug 是内容的 URL 永久链接段，前台地址为 <code>/notes/&lt;slug&gt;</code>；数据库 <code>note.slug</code> 带 UNIQUE，导入脚本也用它判断新建还是覆盖。</li>
+        <li>生成时机：<b>新增</b>时离开标题框自动填一次，或点「用标题生成」强制重算；<b>编辑已有笔记</b>不自动改，避免旧链接失效。</li>
+        <li>一旦手动改过 slug，就标记为「手动」，标题再变也不覆盖；再点「用标题生成」才重置为自动。</li>
+        <li>冲突处理：与已知 slug 重复时自动追加 <code>-2</code>、<code>-3</code>；最终仍由后端 UNIQUE 约束兜底（保存时若撞车返回 409 并提示）。</li>
+        <li>长度上限 80 字符，超出时回退到最后一个连字符处，不留半个词。</li>
+        <li>中文标题必须转拼音才符合字符集，多音字按 pinyin-pro 词库判定，个别不准时可手动改。</li>
+      </ul>
+      <div class="hint-row" style="margin-top:6px">已知 slug（点击可填到标题做冲突演示）：</div>
+      <div class="note-list" id="existing"></div>
+    </div>
+  </section>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="assets/pinyin-pro-3.29.5.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var MAX_LEN = 80;
+  var EXISTING = [
+    '401-on-public-auth-paths',
+    'bad-debt-writeoff-design',
+    'baseline-filter-asymmetry',
+    'device-name-to-safe-path',
+    'excel-row-probe-infinite-loop',
+    'favorite-partition-invariant',
+    'fnos-fpk-install-rejected',
+    'gateway-base-href-missing-assets',
+    'http-listener-to-tcplistener',
+    'imap-inbox-flag-not-standard',
+    'imap-uid-range-star-trap',
+    'immutable-ledger-void-only'
+  ];
+
+  var el = {
+    title: document.getElementById('title'),
+    slug: document.getElementById('slug'),
+    slugRow: document.getElementById('slugRow'),
+    state: document.getElementById('slugState'),
+    hint: document.getElementById('slugHint'),
+    len: document.getElementById('slugLen'),
+    gen: document.getElementById('genBtn'),
+    reset: document.getElementById('resetBtn'),
+    copy: document.getElementById('copyBtn'),
+    save: document.getElementById('saveBtn'),
+    publish: document.getElementById('publishBtn'),
+    seg: document.getElementById('seg'),
+    existing: document.getElementById('existing'),
+    toast: document.getElementById('toast'),
+    s1: document.getElementById('s1'),
+    s2: document.getElementById('s2'),
+    s3: document.getElementById('s3'),
+    s4: document.getElementById('s4'),
+    s5: document.getElementById('s5')
+  };
+
+  var state = {
+    mode: 'create',
+    touched: false,      // 用户是否手动改过 slug
+    autoFilled: false,   // 当前 slug 是否由标题自动生成
+    lastSteps: null
+  };
+
+  function tokensOf(text) {
+    if (!text) return [];
+    return pinyinPro.pinyin(text, { toneType: 'none', type: 'array', nonZh: 'consecutive' })
+      .map(function (t) { return String(t).trim(); })
+      .filter(Boolean);
+  }
+
+  function truncate(value) {
+    if (value.length <= MAX_LEN) return value;
+    var cut = value.slice(0, MAX_LEN);
+    var idx = cut.lastIndexOf('-');
+    if (idx >= 20) cut = cut.slice(0, idx);
+    return cut.replace(/-+$/, '');
+  }
+
+  function build(title) {
+    var tokens = tokensOf(title);
+    var joined = tokens.join('-');
+    var cleaned = joined
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/-{2,}/g, '-')
+      .replace(/^-+|-+$/g, '');
+    var base = truncate(cleaned);
+    var finalSlug = base;
+    var suffix = '';
+
+    if (base && EXISTING.indexOf(base) !== -1) {
+      var n = 2;
+      while (EXISTING.indexOf(truncate(base.slice(0, MAX_LEN - 3)) + '-' + n) !== -1) { n += 1; }
+      suffix = '-' + n;
+      finalSlug = truncate(base.slice(0, MAX_LEN - suffix.length)) + suffix;
+    }
+
+    return { tokens: tokens, joined: joined, cleaned: cleaned, base: base, suffix: suffix, slug: finalSlug };
+  }
+
+  function renderSteps(result, title) {
+    el.s1.textContent = title || '—';
+    el.s2.innerHTML = '';
+    if (!result || !result.tokens.length) {
+      var empty = document.createElement('span');
+      empty.className = 'chip';
+      empty.textContent = '—';
+      el.s2.appendChild(empty);
+    } else {
+      result.tokens.forEach(function (t) {
+        var c = document.createElement('span');
+        c.className = 'chip' + (/^[A-Za-z0-9]+$/.test(t) ? ' hit' : '');
+        c.textContent = t;
+        el.s2.appendChild(c);
+      });
+    }
+    el.s3.textContent = result && result.joined ? result.joined : '—';
+    el.s4.textContent = result && result.cleaned ? result.cleaned : '—';
+    el.s5.textContent = result && result.slug
+      ? (result.suffix ? result.base + ' → 已存在，追加 ' + result.suffix + ' → ' + result.slug : result.slug + '（无冲突）')
+      : '—';
+  }
+
+  function setState(kind, text) {
+    el.state.className = 'tag ' + kind;
+    el.state.textContent = text;
+  }
+
+  function refreshMeta() {
+    var value = el.slug.value.trim();
+    el.len.textContent = String(value.length);
+    el.slugRow.classList.toggle('dirty', state.touched);
+    var ok = /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value) && value.length >= 2 && value.length <= MAX_LEN;
+    el.save.disabled = !ok;
+    el.publish.disabled = !ok;
+    if (!value) {
+      el.hint.textContent = '长度 2–80，只能是小写字母、数字、连字符';
+    } else if (!ok) {
+      el.hint.textContent = '格式不符：只能小写字母、数字、连字符，且不以连字符开头或结尾';
+    } else {
+      el.hint.textContent = '前台地址：/notes/' + value;
+    }
+  }
+
+  function applyAuto(force) {
+    var title = el.title.value.trim();
+    if (!title) {
+      renderSteps(null, title);
+      if (force) { toast('先填写标题'); }
+      return;
+    }
+    if (!force && state.mode === 'edit' && el.slug.value.trim()) {
+      renderSteps(null, title);
+      return;
+    }
+    var result = build(title);
+    el.slug.value = result.slug;
+    state.touched = false;
+    state.autoFilled = true;
+    renderSteps(result, title);
+    setState('auto', result.suffix ? '已自动生成（重名加 ' + result.suffix + '）' : '已自动生成');
+    refreshMeta();
+  }
+
+  function toast(msg) {
+    el.toast.textContent = msg;
+    el.toast.classList.add('show');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function () { el.toast.classList.remove('show'); }, 1800);
+  }
+
+  // 标题：输入时若可自动，实时跟随；离开时兜底生成
+  el.title.addEventListener('input', function () {
+    if (state.mode === 'edit' && el.slug.value.trim() && !state.touched) {
+      renderSteps(build(el.title.value), el.title.value);
+      return;
+    }
+    if (!state.touched) applyAuto(false);
+    else renderSteps(build(el.title.value), el.title.value);
+  });
+
+  el.title.addEventListener('blur', function () {
+    if (!state.touched && !el.slug.value.trim()) applyAuto(false);
+  });
+
+  el.slug.addEventListener('input', function () {
+    state.touched = true;
+    state.autoFilled = false;
+    setState('manual', '手动修改，标题变化不再覆盖');
+    refreshMeta();
+  });
+
+  el.gen.addEventListener('click', function () {
+    if (!el.title.value.trim()) { toast('先填写标题'); return; }
+    applyAuto(true);
+    toast('已按标题重新生成');
+  });
+
+  el.reset.addEventListener('click', function () {
+    el.title.value = '';
+    el.slug.value = '';
+    state.touched = false;
+    state.autoFilled = false;
+    setState('quiet', '待输入标题');
+    renderSteps(null, '');
+    refreshMeta();
+  });
+
+  el.copy.addEventListener('click', function () {
+    var value = el.slug.value.trim();
+    if (!value) { toast('还没有 slug'); return; }
+    var url = location.origin + '/notes/' + value;
+    if (navigator.clipboard) navigator.clipboard.writeText(url).catch(function () {});
+    toast('已复制：' + url);
+  });
+
+  el.save.addEventListener('click', function () { toast('原型演示：保存草稿（实际会提示已保存）'); });
+  el.publish.addEventListener('click', function () { toast('原型演示：发布（实际会校验摘要与正文）'); });
+
+  document.querySelectorAll('[data-sample]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      el.title.value = btn.getAttribute('data-sample');
+      state.touched = false;
+      applyAuto(true);
+    });
+  });
+
+  el.seg.addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-mode]');
+    if (!btn) return;
+    Array.prototype.forEach.call(el.seg.children, function (b) { b.classList.toggle('on', b === btn); });
+    state.mode = btn.getAttribute('data-mode');
+    if (state.mode === 'edit') {
+      el.title.value = el.title.value || 'SQLite 纯 Go 驱动踩坑记录';
+      el.slug.value = el.slug.value || 'sqlite-pure-go-driver';
+      state.touched = false;
+      renderSteps(null, el.title.value);
+      setState('warn', '编辑已有笔记：不自动改 slug');
+      refreshMeta();
+      toast('编辑场景：改标题不会动已有 slug');
+    } else {
+      el.slug.value = '';
+      state.touched = false;
+      applyAuto(true);
+      toast('新增场景：标题变化自动生成');
+    }
+  });
+
+  EXISTING.forEach(function (slug) {
+    var chip = document.createElement('span');
+    chip.className = 'chip';
+    chip.textContent = slug;
+    chip.style.cursor = 'pointer';
+    chip.addEventListener('click', function () {
+      el.title.value = slug;
+      state.touched = false;
+      applyAuto(true);
+      toast('该 slug 已存在 → 自动追加后缀');
+    });
+    el.existing.appendChild(chip);
+  });
+
+  refreshMeta();
+})();
+</script>
+</body>
+</html>
