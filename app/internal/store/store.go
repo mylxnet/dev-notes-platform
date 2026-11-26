@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"dev-notes-platform/internal/model"
@@ -20,7 +21,7 @@ var (
 	ErrConflict = errors.New("record conflict")
 )
 
-const schemaVersion = 3
+const schemaVersion = 4
 
 // Store 封装 SQLite 连接与迁移。
 type Store struct {
@@ -133,6 +134,27 @@ func (s *Store) migrate(ctx context.Context) error {
 		}
 	}
 
+	// v4：推荐改为笔记自身属性，站点设置不再维护推荐位；迁移时把旧配置回填进来。
+	if current < 4 {
+		exists, err := columnExists(ctx, tx, "note", "is_featured")
+		if err != nil {
+			return err
+		}
+		if !exists {
+			if _, err := tx.ExecContext(ctx,
+				`ALTER TABLE note ADD COLUMN is_featured INTEGER NOT NULL DEFAULT 0`); err != nil {
+				return fmt.Errorf("add column note.is_featured: %w", err)
+			}
+		}
+		if _, err := tx.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_note_featured
+			ON note (is_featured, status, published_at DESC, id DESC)`); err != nil {
+			return fmt.Errorf("create note featured index: %w", err)
+		}
+		if err := backfillFeaturedNotes(ctx, tx); err != nil {
+			return err
+		}
+	}
+
 	if _, err := tx.ExecContext(ctx, fmt.Sprintf("PRAGMA user_version = %d", schemaVersion)); err != nil {
 		return fmt.Errorf("set schema version: %w", err)
 	}
@@ -167,6 +189,33 @@ func columnExists(ctx context.Context, tx *sql.Tx, table, column string) (bool, 
 		}
 	}
 	return false, rows.Err()
+}
+
+// backfillFeaturedNotes 把旧版存在 settings.featured_notes 里的推荐位迁到 note.is_featured。
+// 旧值缺失或损坏都按「未配置」处理，不阻塞启动。
+func backfillFeaturedNotes(ctx context.Context, tx *sql.Tx) error {
+	var raw string
+	err := tx.QueryRowContext(ctx, `SELECT value FROM settings WHERE key = 'featured_notes'`).Scan(&raw)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("read legacy featured notes: %w", err)
+	}
+	var slugs []string
+	if err := json.Unmarshal([]byte(raw), &slugs); err != nil {
+		return nil
+	}
+	for _, raw := range slugs {
+		slug := strings.TrimSpace(raw)
+		if slug == "" {
+			continue
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE note SET is_featured = 1 WHERE slug = ?`, slug); err != nil {
+			return fmt.Errorf("backfill featured note %s: %w", slug, err)
+		}
+	}
+	return nil
 }
 
 var schemaStatements = []string{
@@ -216,7 +265,8 @@ const projectColumns = `id, name, slug, summary, tech_stack, repo_url, descripti
 	sort_order, status, created_at, updated_at,
 	(SELECT COUNT(*) FROM note WHERE note.project_id = project.id AND note.status = 'published')`
 
-const noteColumns = `n.id, n.title, n.slug, n.summary, n.content, n.project_id, p.name, p.slug, n.status, n.published_at, n.created_at, n.updated_at`
+const noteColumns = `n.id, n.title, n.slug, n.summary, n.content, n.project_id, p.name, p.slug,
+	n.is_featured, n.status, n.published_at, n.created_at, n.updated_at`
 
 type rowScanner interface {
 	Scan(dest ...any) error
@@ -257,6 +307,7 @@ func scanNote(scanner rowScanner) (*model.Note, error) {
 	var note model.Note
 	var projectID sql.NullInt64
 	var projectName, projectSlug sql.NullString
+	var isFeatured int
 	var publishedAt sql.NullString
 	var createdAt, updatedAt string
 	if err := scanner.Scan(
@@ -268,6 +319,7 @@ func scanNote(scanner rowScanner) (*model.Note, error) {
 		&projectID,
 		&projectName,
 		&projectSlug,
+		&isFeatured,
 		&note.Status,
 		&publishedAt,
 		&createdAt,
@@ -282,6 +334,7 @@ func scanNote(scanner rowScanner) (*model.Note, error) {
 	if projectName.Valid && projectSlug.Valid {
 		note.Project = &model.ProjectSummary{Name: projectName.String, Slug: projectSlug.String}
 	}
+	note.IsFeatured = isFeatured == 1
 	note.PublishedAt = parseNullTime(publishedAt)
 	note.CreatedAt = parseTime(createdAt)
 	note.UpdatedAt = parseTime(updatedAt)

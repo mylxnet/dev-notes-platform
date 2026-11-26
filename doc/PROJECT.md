@@ -1,8 +1,8 @@
 # 技术方案 · 我的开发笔记
 
-> v1.4.8 · by Mr lin · 2026-11-26
+> v1.4.9 · by Mr lin · 2026-11-26
 >
-> 依据：`doc/DESIGN.md` v1.4.8、已确认的 `prototype/` 第一版界面。本文档是后续编码、测试、部署的实施依据，代码实现与本文档不一致时，以本文档评审结论为准。
+> 依据：`doc/DESIGN.md` v1.4.9、已确认的 `prototype/` 第一版界面。本文档是后续编码、测试、部署的实施依据，代码实现与本文档不一致时，以本文档评审结论为准。
 
 ## 一、方案目标与范围
 
@@ -242,6 +242,7 @@ CREATE TABLE IF NOT EXISTS note (
   summary       TEXT NOT NULL,
   content       TEXT NOT NULL,
   project_id    INTEGER,
+  is_featured   INTEGER NOT NULL DEFAULT 0,   -- v4 新增：是否进首页推荐
   status        TEXT NOT NULL DEFAULT 'draft'
                 CHECK (status IN ('published', 'draft', 'hidden')),
   published_at  TEXT,
@@ -279,7 +280,7 @@ CREATE TABLE IF NOT EXISTS settings (
 - 删除项目时笔记不删除，`project_id` 置空，前台显示为“站点记录”。
 - `note_count` 不是表字段，由 `projectColumns` 子查询统计该项目下已发布笔记数，随项目查询一并返回，供前台项目卡片展示。
 - `description` 存 Markdown 原文（上限 20 KB），`cover_image` 存站内路径（如 `/media/projects/example.svg`，空串表示无封面）；两者由 v2 迁移补列。
-- 迁移策略：`PRAGMA user_version` 记录结构版本（当前 `schemaVersion = 3`）。v2 用 `PRAGMA table_info(project)` 探测列是否存在，缺列才执行 `ALTER TABLE ... ADD COLUMN`，因此迁移中断后重跑不会因「列已存在」报错；v3 用 `CREATE TABLE IF NOT EXISTS settings` 建站点配置表；新建库先跑 v1 建表、再走 v2/v3，路径与老库一致。
+- 迁移策略：`PRAGMA user_version` 记录结构版本（当前 `schemaVersion = 4`）。v2 用 `PRAGMA table_info(project)` 探测列是否存在，缺列才执行 `ALTER TABLE ... ADD COLUMN`，因此迁移中断后重跑不会因「列已存在」报错；v3 用 `CREATE TABLE IF NOT EXISTS settings` 建站点配置表；v4 给 `note` 补 `is_featured` 列与 `(is_featured, status, published_at DESC, id DESC)` 索引，并把旧版 `settings.featured_notes` 里的推荐位回填成 `is_featured = 1`（旧值缺失或 JSON 损坏按未配置跳过，不阻塞启动）；新建库先跑 v1 建表、再依次走 v2/v3/v4，路径与老库一致。
 - 前台接口不返回 `description` 原文，只返回渲染净化后的 `description_html`；项目列表接口把 `description` 置空以减小响应体积，`cover_image` 照常下发供卡片展示。
 - v3 迁移用 `CREATE TABLE IF NOT EXISTS settings` 建站点配置表，新旧库同路径；`GetSetting` 对未配置的键返回空串，`SetSetting` 用 UPSERT 覆盖同键。
 
@@ -391,11 +392,11 @@ v1.3.0 实现位置：字段规则与词汇拦截在 `internal/validate`，渲�
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/api/notes?project={slug}&page=1&page_size=10&q={kw}` | 已发布笔记列表，`page_size` 上限 50 |
+| GET | `/api/notes?project={slug}&page=1&page_size=10&q={kw}&featured=1` | 已发布笔记列表，`page_size` 上限 50；`featured=1` 只看被标为推荐的笔记 |
 | GET | `/api/notes/{slug}` | 已发布笔记详情，`content` 为 Markdown 原文（Section 3 接入渲染） |
 | GET | `/api/projects` | 已发布项目列表，每项含计算字段 `note_count`；`description` 置空、`cover_image` 照常下发 |
 | GET | `/api/projects/{slug}` | 已发布项目详情 + 关联笔记；项目自带 `description_html`，`description` 原文置空 |
-| GET | `/api/site` | 站点公开信息：页脚备案号 `icp_number`，未配置为 `""` |
+| GET | `/api/site` | 站点公开信息：页脚备案号 `icp_number`（未配置为 `""`）与首页推荐面板 `featured_notes`（已发布且 `is_featured` 的最新 3 条） |
 
 管理接口：
 
@@ -733,6 +734,8 @@ services:
 | 后台笔记列表分页（v1.4.1） | `status`/`q` 筛选与分页叠加后 `total` 为筛选后的总数，翻页不越界 |
 | 项目说明与封面（v1.4.0） | 后台创建/更新后原样读回；`/api/projects/{slug}` 返回 `description_html` 且 `description` 为空；列表接口 `description` 为空、`cover_image` 保留；非法封面路径与说明内禁用词返回 422 |
 | v1 老库升级（v1.4.0） | 用 v1 建表语句造库并置 `user_version=1`，`Open` 后自动补 `description` / `cover_image` 两列，老数据保留、新列可写可读、重复打开不报错 |
+| 推荐笔记字段（v1.4.9） | 勾选 `is_featured` 后 `/api/notes?featured=1` 的 `total` 增一；`/api/site` 只下发前 3 条且按发布时间倒序；草稿即使勾选也不出现；取消推荐后两处立即移除 |
+| v3 老库升级推荐字段（v1.4.9） | 造 `user_version=3` 的库并写入 `settings.featured_notes`，`Open` 后对应笔记 `is_featured=1`、其他笔记不受影响，重复打开不重复迁移 |
 | 站点配置公开读取（v1.4.3） | `GET /api/site` 返回 `icp_number`；后台保存后公开接口立即读到新值；清空后为空串 |
 | 站点配置鉴权（v1.4.3） | 未登录 GET/PUT `/api/admin/settings` 返回 401；PUT 缺 CSRF 返回 403 |
 | 封面图上传（v1.4.4） | 合法 PNG 上传返回随机路径且可直接 GET 200；SVG/伪装文件/超限/未登录/缺 CSRF 被拒；非法文件名 404 |
@@ -907,6 +910,7 @@ ADMIN_PASSWORD=你的密码 MODE=update bash tools/import-notes.sh
 
 | 版本 | 日期 | 变更 |
 |---|---|---|
+| v1.4.9 | 2026-11-26 | 推荐改为笔记字段（`is_featured`，schema 4）：编辑页勾选「设为首页推荐」、列表加推荐徽标，首页「全部」进 `/notes?featured=1` 全量推荐列表，站点设置只留备案号；旧推荐位自动回填 |
 | v1.4.8 | 2026-11-26 | 主题按钮窄屏收成 44px 圆形纯圆点、补 `title` 提示、后台窄屏留底部安全区；首屏主题脚本改为外部文件以符合生产 CSP；Vite 开轮询修复 WSL 不热更新 |
 | v1.4.7 | 2026-11-25 | 项目页改版：横向缩略图卡片、详情页图文并排、截图点击灯箱放大 |
 | v1.4.6 | 2026-11-17 | 补齐 Docker 构建链（多阶段 Dockerfile、Compose、阿里云推送脚本）并重写部署手册 |

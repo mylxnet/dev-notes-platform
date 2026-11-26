@@ -137,7 +137,10 @@ onUnmounted(() => window.clearTimeout(searchTimer))
           <tr v-for="note in notes" :key="note.id">
             <td>{{ note.title }}</td>
             <td>{{ note.project?.name ?? '站点记录' }}</td>
-            <td><span class="status" :class="`status-${note.status}`">{{ statusText[note.status] }}</span></td>
+            <td>
+              <span class="status" :class="`status-${note.status}`">{{ statusText[note.status] }}</span>
+              <span v-if="note.is_featured" class="badge-featured">推荐</span>
+            </td>
             <td>{{ formatDate(note.published_at) || '—' }}</td>
             <td>
               <div class="row-actions">

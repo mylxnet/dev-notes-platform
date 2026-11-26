@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -68,10 +69,11 @@ func (s *Server) listNotes(c *gin.Context) {
 	}
 
 	filter := store.NoteFilter{
-		ProjectSlug: c.Query("project"),
-		Keyword:     c.Query("q"),
-		Limit:       pageSize,
-		Offset:      (page - 1) * pageSize,
+		ProjectSlug:  c.Query("project"),
+		Keyword:      c.Query("q"),
+		FeaturedOnly: isTruthy(c.Query("featured")),
+		Limit:        pageSize,
+		Offset:       (page - 1) * pageSize,
 	}
 	notes, err := s.store.ListPublishedNotes(c.Request.Context(), filter)
 	if err != nil {
@@ -100,6 +102,16 @@ func (s *Server) getNote(c *gin.Context) {
 	note.ContentHTML = render.Markdown(note.Content)
 	note.Content = ""
 	respondOK(c, note)
+}
+
+// isTruthy 把 1 / true / yes 这类查询值当作真，其余按假处理。
+func isTruthy(raw string) bool {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "1", "true", "yes":
+		return true
+	default:
+		return false
+	}
 }
 
 func positiveInt(raw string, fallback int) int {

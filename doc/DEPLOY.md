@@ -1,6 +1,6 @@
 # 部署手册 · 我的开发笔记
 
-> v1.4.8 · by Mr lin · 2026-11-26
+> v1.4.9 · by Mr lin · 2026-11-26
 
 ## 一、部署前置条件
 
@@ -54,8 +54,8 @@ tar czf backup-$(date +%F).tar.gz -C <compose目录> data
    ```bash
    sudo useradd -r -s /usr/sbin/nologin devnotes
    sudo mkdir -p /opt/dev-notes/bin /opt/dev-notes/data
-   sudo install -m 0755 /tmp/dev-notes /opt/dev-notes/bin/dev-notes-1.4.8
-   sudo ln -sfn /opt/dev-notes/bin/dev-notes-1.4.8 /opt/dev-notes/bin/dev-notes
+   sudo install -m 0755 /tmp/dev-notes /opt/dev-notes/bin/dev-notes-1.4.9
+   sudo ln -sfn /opt/dev-notes/bin/dev-notes-1.4.9 /opt/dev-notes/bin/dev-notes
    sudo chown -R devnotes:devnotes /opt/dev-notes
    ```
 3. 写 `/etc/dev-notes.env`（权限 600），字段见第六节；`SESSION_SECRET` 用 `openssl rand -hex 32` 生成。
@@ -87,7 +87,7 @@ tar czf backup-$(date +%F).tar.gz -C <compose目录> data
    sudo systemctl enable --now dev-notes
    sudo systemctl status dev-notes
    curl -s http://127.0.0.1:8080/healthz
-   # 期望 {"db":"ok","status":"ok","version":"1.4.8"}
+   # 期望 {"db":"ok","status":"ok","version":"1.4.9"}
    ```
 
 **1Panel 界面配合**：「文件」上传二进制、编辑 env；「终端」粘贴上面第 4、5 步命令；「网站」建反向代理；「计划任务」跑备份脚本。systemd 服务注册目前仍需命令，1Panel 没有纯点击入口。
@@ -101,16 +101,16 @@ tar czf backup-$(date +%F).tar.gz -C <compose目录> data
 2. 构建并推送 amd64 镜像：
    ```bash
    bash scripts/push-image.sh
-   # 版本取 app/VERSION（当前 1.4.8）；可附加 --tag 覆盖，如 --tag v1.4.8
+   # 版本取 app/VERSION（当前 1.4.9）；可附加 --tag 覆盖，如 --tag v1.4.9
    ```
    脚本复用 `build.sh` 的版本校验，由 `deploy/Dockerfile` 在镜像内编译前后端；**只构建 `linux/amd64`**，用 `DOCKER_BUILDKIT=0 docker build` + `docker push` 推送。Docker 29 默认走 BuildKit，会附带 OCI 空 manifest（`application/vnd.oci.empty.v1+json`），阿里云 ACR 拒收；legacy builder 不附带该类型，产物为不含 attestation 的 OCI image manifest，已验证可正常拉取与运行。
 3. 准备变量文件：把 `deploy/.env.example` 复制为 `deploy/.env`，填 `SESSION_SECRET`（≥32 位）与 `ADMIN_INIT_PASSWORD`（≥12 位）。`.env` 已在 `.gitignore` 中，不会入库。
 4. 把数据放进 compose 项目目录的 `./data/`（`notes.db` 与 `media/`），并设属主为容器运行用户 `uid=100:gid=101`：`chown -R 100:101 ./data`。实测容器内 `app` 用户是 uid=100、gid=101（alpine 中 gid 100 已被占用，`addgroup -S app` 分到 101）；属主不对会导致启动时数据库只读或直接失败。空库首次启动也建议先建好 `./data/` 并 chown。
 5. 1Panel「容器 → Compose → 创建」，粘贴 `deploy/docker-compose.yml` 内容；确认数据卷 `./data:/app/data`、端口映射 `127.0.0.1:8080:8080`。
-6. 容器启动后看日志与健康检查，`curl -s http://127.0.0.1:8080/healthz` 应返回与 compose 中 tag 相同的版本号（当前 `1.4.8`）。
-7. 升级：改 compose 中镜像 tag（如 `:1.4.9`），1Panel 点「重新创建容器」，数据卷不变。回滚则改回旧 tag。
+6. 容器启动后看日志与健康检查，`curl -s http://127.0.0.1:8080/healthz` 应返回与 compose 中 tag 相同的版本号（当前 `1.4.9`）。
+7. 升级：改 compose 中镜像 tag（如 `:1.5.0`），1Panel 点「重新创建容器」，数据卷不变。回滚则改回旧 tag。
 
-> ℹ️ `1.4.8` 与 `latest` 已于 2026-11-26 推送阿里云（`application/vnd.oci.image.manifest.v1+json`），可直接上机；后续改版本号时记得先执行第 2 步的 `scripts/push-image.sh`，否则 1Panel 拉到该 tag 会失败。
+> ℹ️ `1.4.8` 与 `latest` 已于 2026-11-26 推送阿里云（`application/vnd.oci.image.manifest.v1+json`）；`1.4.9` **镜像尚未推送**，上机前先执行第 2 步的 `scripts/push-image.sh`，否则 1Panel 拉到该 tag 会失败。首次启动会自动把库迁到 `user_version=4`（补 `note.is_featured` 并回填旧推荐位），迁移前建议先备份 `notes.db`。
 
 `deploy/.env.example` 不可删除；compose 用 `${VAR:?}` 强制变量存在，缺变量时容器拒绝启动，避免弱密码上线。
 

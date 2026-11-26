@@ -38,6 +38,7 @@ const form = ref({
   summary: '',
   content: '',
   project_id: null as number | null,
+  is_featured: false,
   status: 'draft' as ContentStatus,
   published_at: ''
 })
@@ -51,6 +52,7 @@ function toInput(): NoteInput {
     summary: form.value.summary.trim(),
     content: form.value.content,
     project_id: form.value.project_id,
+    is_featured: form.value.is_featured,
     status: form.value.status,
     published_at: form.value.published_at ? `${form.value.published_at}T00:00:00Z` : ''
   }
@@ -178,6 +180,7 @@ onMounted(async () => {
       summary: note.summary,
       content: note.content ?? '',
       project_id: note.project_id ?? null,
+      is_featured: note.is_featured,
       status: note.status,
       published_at: note.published_at ? note.published_at.slice(0, 10) : ''
     }
@@ -275,6 +278,16 @@ onBeforeRouteLeave(() => {
           <input v-model="form.published_at" type="date" :disabled="form.status !== 'published'" />
         </label>
       </div>
+
+      <label class="field-inline">
+        <input v-model="form.is_featured" type="checkbox" :disabled="saving" />
+        <span>
+          设为首页推荐
+          <span class="field-note" style="display: block">
+            勾选后进入首页「推荐笔记」面板；只有已发布的笔记会真的显示在首页
+          </span>
+        </span>
+      </label>
 
       <div class="field-block">
         <div class="field-head"><span>正文（Markdown）</span><span>工具栏插入语法，右侧实时预览；图片走站内上传</span></div>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import NoteCard from '../components/NoteCard.vue'
 import EmptyState from '../components/EmptyState.vue'
 import Pager from '../components/Pager.vue'
@@ -7,6 +8,11 @@ import { errorMessageOf, fetchNotes, fetchProjects, type Note, type Project } fr
 
 /** 每页固定 6 篇，翻页由后端分页承担。 */
 const PAGE_SIZE = 6
+
+const route = useRoute()
+const router = useRouter()
+/** 首页「推荐笔记 → 全部」带 featured=1 进来，只看被标为推荐的笔记。 */
+const featuredOnly = ref(route.query.featured === '1')
 
 const projects = ref<Project[]>([])
 const notes = ref<Note[]>([])
@@ -33,6 +39,7 @@ async function load() {
       {
         project: activeProject.value ?? undefined,
         keyword: keyword.value.trim() || undefined,
+        featured: featuredOnly.value || undefined,
         page: page.value,
         pageSize: PAGE_SIZE
       },
@@ -84,6 +91,30 @@ function selectProject(slug: string | null) {
   load()
 }
 
+/** 推荐筛选进 URL，刷新或分享后仍是同一视图；清掉时不留空参数。 */
+function setFeatured(next: boolean) {
+  if (featuredOnly.value === next) return
+  featuredOnly.value = next
+  page.value = 1
+  const query = { ...route.query }
+  if (next) query.featured = '1'
+  else delete query.featured
+  void router.replace({ query })
+  void load()
+}
+
+// 同一页面内由别处（如页脚导航）改 query 时跟随，避免地址与视图不一致。
+watch(
+  () => route.query.featured,
+  (value) => {
+    const next = value === '1'
+    if (next === featuredOnly.value) return
+    featuredOnly.value = next
+    page.value = 1
+    void load()
+  }
+)
+
 watch(keyword, () => {
   window.clearTimeout(searchTimer)
   searchTimer = window.setTimeout(() => {
@@ -107,14 +138,19 @@ onUnmounted(() => {
   <div class="container section">
     <div class="section-head">
       <div>
-        <h1 class="section-title">笔记列表</h1>
-        <div class="section-subtitle">按日期倒序 · 支持按项目筛选</div>
+        <h1 class="section-title">{{ featuredOnly ? '推荐笔记' : '笔记列表' }}</h1>
+        <div class="section-subtitle">
+          {{ featuredOnly ? '首页推荐过的笔记都在这里 · 按发布时间倒序' : '按日期倒序 · 支持按项目筛选' }}
+        </div>
       </div>
-      <span class="section-subtitle">共 {{ total }} 篇</span>
+      <span class="section-subtitle list-count">共 {{ total }} 篇</span>
     </div>
 
     <div class="filters">
       <button class="chip" :class="{ active: activeProject === null }" type="button" @click="selectProject(null)">全部</button>
+      <button v-if="featuredOnly" class="chip active" type="button" @click="setFeatured(false)">
+        仅看推荐 ✕
+      </button>
       <button
         v-for="project in projects"
         :key="project.id"
@@ -142,7 +178,15 @@ onUnmounted(() => {
     <div v-else-if="notes.length" class="note-list">
       <NoteCard v-for="note in notes" :key="note.id" :note="note" />
     </div>
-    <EmptyState v-else title="没有匹配的笔记" description="换个关键词，或选择「全部」项目筛选。" />
+    <EmptyState
+      v-else
+      :title="featuredOnly ? '还没有推荐的笔记' : '没有匹配的笔记'"
+      :description="
+        featuredOnly
+          ? '在后台打开一篇笔记，勾选「设为首页推荐」并保存后，这里就会出现。'
+          : '换个关键词，或选择「全部」项目筛选。'
+      "
+    />
 
     <Pager
       v-if="!loading"

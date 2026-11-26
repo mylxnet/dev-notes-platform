@@ -71,7 +71,7 @@ function initialOf(name: string): string {
       <aside v-if="loading || featuredNotes.length" class="hero-panel" aria-label="推荐笔记">
         <div class="panel-head">
           <strong>推荐笔记</strong>
-          <RouterLink to="/notes" class="link-more">全部</RouterLink>
+          <RouterLink to="/notes?featured=1" class="link-more">全部</RouterLink>
         </div>
         <div class="panel-list">
           <template v-if="loading">

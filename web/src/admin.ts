@@ -22,6 +22,8 @@ export interface NoteInput {
   summary: string
   content: string
   project_id: number | null
+  /** 是否进首页推荐面板。 */
+  is_featured: boolean
   status: ContentStatus
   /** 空串表示沿用原发布时间或由后端补齐。 */
   published_at: string

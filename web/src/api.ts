@@ -40,6 +40,8 @@ export interface Note {
   content_html?: string
   project_id?: number
   project?: ProjectSummary
+  /** 是否进首页「推荐笔记」面板，由后台在笔记表单里勾选。 */
+  is_featured: boolean
   status: ContentStatus
   published_at?: string
   created_at: string
@@ -53,7 +55,7 @@ export interface PagedNotes {
   page_size: number
 }
 
-/** 首页推荐面板需要的笔记摘要，由后台「站点设置」维护。 */
+/** 首页推荐面板需要的笔记摘要，取自已勾选「设为推荐」的笔记。 */
 export interface FeaturedNote {
   slug: string
   title: string
@@ -66,10 +68,9 @@ export interface SiteInfo {
   featured_notes?: FeaturedNote[]
 }
 
-/** 后台站点设置：备案号与推荐位 slug（按展示顺序）。 */
+/** 后台站点设置：只剩备案号，推荐已改为笔记自身字段。 */
 export interface AdminSettings {
   icp_number: string
-  featured_slugs: string[]
 }
 
 /** 后台项目列表与公开项目列表的分页响应。 */
@@ -177,14 +178,15 @@ export async function requestJSON<T>(path: string, options: RequestOptions = {})
   return body.data as T
 }
 
-/** 查询已发布笔记，支持项目筛选、关键词与分页。 */
+/** 查询已发布笔记，支持项目筛选、关键词、只看推荐与分页。 */
 export function fetchNotes(
-  params: { project?: string; keyword?: string; page?: number; pageSize?: number } = {},
+  params: { project?: string; keyword?: string; featured?: boolean; page?: number; pageSize?: number } = {},
   signal?: AbortSignal
 ): Promise<PagedNotes> {
   const query = new URLSearchParams()
   if (params.project) query.set('project', params.project)
   if (params.keyword) query.set('q', params.keyword)
+  if (params.featured) query.set('featured', '1')
   if (params.page && params.page > 1) query.set('page', String(params.page))
   if (params.pageSize) query.set('page_size', String(params.pageSize))
   const suffix = query.toString()

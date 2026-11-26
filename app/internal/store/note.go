@@ -15,8 +15,10 @@ import (
 type NoteFilter struct {
 	ProjectSlug string
 	Keyword     string
-	Limit       int
-	Offset      int
+	// FeaturedOnly 只看被标记为推荐的笔记（首页推荐面板的「全部」用）。
+	FeaturedOnly bool
+	Limit        int
+	Offset       int
 }
 
 // AdminNoteFilter 是后台笔记列表的筛选条件。
@@ -45,6 +47,9 @@ func (s *Store) ListPublishedNotes(ctx context.Context, filter NoteFilter) ([]mo
 		like := "%" + filter.Keyword + "%"
 		args = append(args, like, like)
 	}
+	if filter.FeaturedOnly {
+		builder.WriteString(` AND n.is_featured = 1`)
+	}
 	builder.WriteString(` ORDER BY n.published_at DESC, n.id DESC LIMIT ? OFFSET ?`)
 	args = append(args, normalizeLimit(filter.Limit), normalizeOffset(filter.Offset))
 
@@ -65,6 +70,11 @@ func (s *Store) ListPublishedNotes(ctx context.Context, filter NoteFilter) ([]mo
 	return notes, rows.Err()
 }
 
+// ListFeaturedNotes 返回首页推荐面板用的已发布推荐笔记，按发布时间倒序取前 limit 条。
+func (s *Store) ListFeaturedNotes(ctx context.Context, limit int) ([]model.Note, error) {
+	return s.ListPublishedNotes(ctx, NoteFilter{FeaturedOnly: true, Limit: limit})
+}
+
 // CountPublishedNotes 返回已发布笔记总数。
 func (s *Store) CountPublishedNotes(ctx context.Context, filter NoteFilter) (int, error) {
 	var builder strings.Builder
@@ -82,6 +92,9 @@ func (s *Store) CountPublishedNotes(ctx context.Context, filter NoteFilter) (int
 		builder.WriteString(` AND (n.title LIKE ? OR n.summary LIKE ?)`)
 		like := "%" + filter.Keyword + "%"
 		args = append(args, like, like)
+	}
+	if filter.FeaturedOnly {
+		builder.WriteString(` AND n.is_featured = 1`)
 	}
 
 	var count int
@@ -192,13 +205,14 @@ func (s *Store) CreateNote(ctx context.Context, note *model.Note) (int64, error)
 	}
 	now := nowText()
 	result, err := s.db.ExecContext(ctx, `INSERT INTO note
-		(title, slug, summary, content, project_id, status, published_at, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		(title, slug, summary, content, project_id, is_featured, status, published_at, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		note.Title,
 		note.Slug,
 		note.Summary,
 		note.Content,
 		nullableID(note.ProjectID),
+		boolInt(note.IsFeatured),
 		note.Status,
 		nullableTime(note.PublishedAt),
 		now,
@@ -228,7 +242,7 @@ func (s *Store) UpdateNote(ctx context.Context, note *model.Note) error {
 	}
 	now := nowText()
 	result, err := s.db.ExecContext(ctx, `UPDATE note SET
-		title = ?, slug = ?, summary = ?, content = ?, project_id = ?,
+		title = ?, slug = ?, summary = ?, content = ?, project_id = ?, is_featured = ?,
 		status = ?, published_at = ?, updated_at = ?
 		WHERE id = ?`,
 		note.Title,
@@ -236,6 +250,7 @@ func (s *Store) UpdateNote(ctx context.Context, note *model.Note) error {
 		note.Summary,
 		note.Content,
 		nullableID(note.ProjectID),
+		boolInt(note.IsFeatured),
 		note.Status,
 		nullableTime(note.PublishedAt),
 		now,
@@ -272,6 +287,13 @@ func (s *Store) DeleteNote(ctx context.Context, id int64) error {
 		return ErrNotFound
 	}
 	return nil
+}
+
+func boolInt(value bool) int {
+	if value {
+		return 1
+	}
+	return 0
 }
 
 func normalizeLimit(limit int) int {

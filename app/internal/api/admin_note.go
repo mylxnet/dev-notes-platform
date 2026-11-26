@@ -15,24 +15,27 @@ import (
 )
 
 type noteInput struct {
-	Title       string       `json:"title"`
-	Slug        string       `json:"slug"`
-	Summary     string       `json:"summary"`
-	Content     string       `json:"content"`
-	ProjectID   *int64       `json:"project_id"`
+	Title     string `json:"title"`
+	Slug      string `json:"slug"`
+	Summary   string `json:"summary"`
+	Content   string `json:"content"`
+	ProjectID *int64 `json:"project_id"`
+	// IsFeatured 决定这篇笔记是否进首页推荐面板。
+	IsFeatured  bool         `json:"is_featured"`
 	Status      model.Status `json:"status"`
 	PublishedAt string       `json:"published_at"`
 }
 
 func (in *noteInput) toModel(id int64) (*model.Note, error) {
 	note := &model.Note{
-		ID:        id,
-		Title:     strings.TrimSpace(in.Title),
-		Slug:      strings.TrimSpace(in.Slug),
-		Summary:   strings.TrimSpace(in.Summary),
-		Content:   in.Content,
-		ProjectID: in.ProjectID,
-		Status:    in.Status,
+		ID:         id,
+		Title:      strings.TrimSpace(in.Title),
+		Slug:       strings.TrimSpace(in.Slug),
+		Summary:    strings.TrimSpace(in.Summary),
+		Content:    in.Content,
+		ProjectID:  in.ProjectID,
+		IsFeatured: in.IsFeatured,
+		Status:     in.Status,
 	}
 	if in.PublishedAt != "" {
 		parsed, err := time.Parse(time.RFC3339, in.PublishedAt)

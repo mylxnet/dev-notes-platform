@@ -60,10 +60,12 @@ type Note struct {
 	ContentHTML string          `json:"content_html,omitempty"`
 	ProjectID   *int64          `json:"project_id,omitempty"`
 	Project     *ProjectSummary `json:"project,omitempty"`
-	Status      Status          `json:"status"`
-	PublishedAt *time.Time      `json:"published_at,omitempty"`
-	CreatedAt   time.Time       `json:"created_at"`
-	UpdatedAt   time.Time       `json:"updated_at"`
+	// IsFeatured 表示是否进入首页「推荐笔记」面板，由后台在笔记表单里勾选。
+	IsFeatured  bool       `json:"is_featured"`
+	Status      Status     `json:"status"`
+	PublishedAt *time.Time `json:"published_at,omitempty"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
 }
 
 // Admin 对应 admin 表。

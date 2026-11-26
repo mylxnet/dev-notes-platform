@@ -230,6 +230,114 @@ func TestMigrateV1Database(t *testing.T) {
 	_ = second.Close()
 }
 
+// TestMigrateFeaturedBackfill 验证 v3 → v4：旧版存在站点设置里的推荐位会回填成 note.is_featured，
+// 且重复打开不再重复执行迁移。
+func TestMigrateFeaturedBackfill(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "notes.db")
+	raw, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatalf("open raw sqlite: %v", err)
+	}
+	for _, statement := range []string{
+		`CREATE TABLE project (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			name TEXT NOT NULL,
+			slug TEXT NOT NULL UNIQUE,
+			summary TEXT NOT NULL,
+			tech_stack TEXT NOT NULL DEFAULT '[]',
+			repo_url TEXT NOT NULL,
+			description TEXT NOT NULL DEFAULT '',
+			cover_image TEXT NOT NULL DEFAULT '',
+			sort_order INTEGER NOT NULL DEFAULT 0,
+			status TEXT NOT NULL DEFAULT 'draft',
+			created_at TEXT NOT NULL,
+			updated_at TEXT NOT NULL
+		);`,
+		`CREATE TABLE note (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			title TEXT NOT NULL,
+			slug TEXT NOT NULL UNIQUE,
+			summary TEXT NOT NULL,
+			content TEXT NOT NULL,
+			project_id INTEGER,
+			status TEXT NOT NULL DEFAULT 'draft',
+			published_at TEXT,
+			created_at TEXT NOT NULL,
+			updated_at TEXT NOT NULL
+		);`,
+		`CREATE TABLE settings (
+			key TEXT PRIMARY KEY,
+			value TEXT NOT NULL DEFAULT '',
+			updated_at TEXT NOT NULL
+		);`,
+		`INSERT INTO note (title, slug, summary, content, status, published_at, created_at, updated_at)
+			VALUES ('老推荐', 'old-featured', '摘要', '正文', 'published', '2026-11-01T00:00:00Z', '2026-11-01T00:00:00Z', '2026-11-01T00:00:00Z');`,
+		`INSERT INTO note (title, slug, summary, content, status, published_at, created_at, updated_at)
+			VALUES ('普通笔记', 'old-plain', '摘要', '正文', 'published', '2026-11-02T00:00:00Z', '2026-11-02T00:00:00Z', '2026-11-02T00:00:00Z');`,
+		`INSERT INTO settings (key, value, updated_at)
+			VALUES ('featured_notes', '["old-featured"]', '2026-11-01T00:00:00Z');`,
+		`PRAGMA user_version = 3;`,
+	} {
+		if _, err := raw.Exec(statement); err != nil {
+			_ = raw.Close()
+			t.Fatalf("prepare v3 schema: %v", err)
+		}
+	}
+	if err := raw.Close(); err != nil {
+		t.Fatalf("close raw sqlite: %v", err)
+	}
+
+	st, err := Open(context.Background(), path)
+	if err != nil {
+		t.Fatalf("migrate v3 database: %v", err)
+	}
+	ctx := context.Background()
+
+	notes, err := st.ListAllNotes(ctx, AdminNoteFilter{Limit: 10})
+	if err != nil {
+		t.Fatalf("list notes after migration: %v", err)
+	}
+	featured := map[string]bool{}
+	for _, note := range notes {
+		featured[note.Slug] = note.IsFeatured
+	}
+	if !featured["old-featured"] {
+		t.Fatalf("expected old-featured backfilled as featured, got %+v", featured)
+	}
+	if featured["old-plain"] {
+		t.Fatalf("expected old-plain to stay unfeatured, got %+v", featured)
+	}
+
+	// 迁移后新列可写可读。
+	note, err := st.GetNoteByID(ctx, notes[0].ID)
+	if err != nil {
+		t.Fatalf("read note after migration: %v", err)
+	}
+	if note.Slug == "old-plain" {
+		note.IsFeatured = true
+		if err := st.UpdateNote(ctx, note); err != nil {
+			t.Fatalf("update featured flag: %v", err)
+		}
+		reread, err := st.GetNoteByID(ctx, note.ID)
+		if err != nil {
+			t.Fatalf("reread note: %v", err)
+		}
+		if !reread.IsFeatured {
+			t.Fatalf("expected featured persisted, got %+v", reread)
+		}
+	}
+
+	// 再开一次不应重复执行 ALTER 或重复回填。
+	second, err := Open(ctx, path)
+	if err != nil {
+		t.Fatalf("reopen migrated database: %v", err)
+	}
+	if _, err := second.ListFeaturedNotes(ctx, 10); err != nil {
+		t.Fatalf("list featured after reopen: %v", err)
+	}
+	_ = second.Close()
+}
+
 // TestSettingsStore 验证站点配置读写：未配置为普通空串，同键覆盖更新。
 func TestSettingsStore(t *testing.T) {
 	st := newTestStore(t)
