@@ -31,7 +31,7 @@ type featuredNoteView struct {
 
 // featuredNotes 取被标记为推荐且已发布的笔记；推荐是笔记自身属性，不再由站点设置维护。
 func (s *Server) featuredNotes(ctx context.Context) []featuredNoteView {
-	notes, err := s.store.ListFeaturedNotes(ctx, maxFeaturedNotes)
+	notes, err := s.store().ListFeaturedNotes(ctx, maxFeaturedNotes)
 	if err != nil {
 		return []featuredNoteView{}
 	}
@@ -49,7 +49,7 @@ func (s *Server) featuredNotes(ctx context.Context) []featuredNoteView {
 // siteInfo 返回前台页脚需要的备案号与首页推荐笔记；未配置时返回空值。
 func (s *Server) siteInfo(c *gin.Context) {
 	ctx := c.Request.Context()
-	icp, err := s.store.GetSetting(ctx, settingICPNumber)
+	icp, err := s.store().GetSetting(ctx, settingICPNumber)
 	if err != nil {
 		respondError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "站点信息加载失败")
 		return
@@ -59,7 +59,7 @@ func (s *Server) siteInfo(c *gin.Context) {
 
 // adminGetSettings 返回后台可编辑的站点配置（只剩备案号，推荐已迁到笔记表单）。
 func (s *Server) adminGetSettings(c *gin.Context) {
-	icp, err := s.store.GetSetting(c.Request.Context(), settingICPNumber)
+	icp, err := s.store().GetSetting(c.Request.Context(), settingICPNumber)
 	if err != nil {
 		respondError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "站点设置加载失败")
 		return
@@ -80,7 +80,7 @@ func (s *Server) adminUpdateSettings(c *gin.Context) {
 		respondFieldError(c, fieldErr)
 		return
 	}
-	if err := s.store.SetSetting(ctx, settingICPNumber, in.ICPNumber); err != nil {
+	if err := s.store().SetSetting(ctx, settingICPNumber, in.ICPNumber); err != nil {
 		respondError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "站点设置保存失败")
 		return
 	}

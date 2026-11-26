@@ -62,12 +62,12 @@ func (s *Server) adminListNotes(c *gin.Context) {
 		Offset:  (page - 1) * pageSize,
 	}
 
-	notes, err := s.store.ListAllNotes(c.Request.Context(), filter)
+	notes, err := s.store().ListAllNotes(c.Request.Context(), filter)
 	if err != nil {
 		respondError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "笔记列表加载失败")
 		return
 	}
-	total, err := s.store.CountAllNotes(c.Request.Context(), filter)
+	total, err := s.store().CountAllNotes(c.Request.Context(), filter)
 	if err != nil {
 		respondError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "笔记总数统计失败")
 		return
@@ -85,7 +85,7 @@ func (s *Server) adminGetNote(c *gin.Context) {
 	if !ok {
 		return
 	}
-	note, err := s.store.GetNoteByID(c.Request.Context(), id)
+	note, err := s.store().GetNoteByID(c.Request.Context(), id)
 	if errors.Is(err, store.ErrNotFound) {
 		respondError(c, http.StatusNotFound, "NOT_FOUND", "笔记不存在")
 		return
@@ -113,7 +113,7 @@ func (s *Server) adminCreateNote(c *gin.Context) {
 		return
 	}
 
-	id, err := s.store.CreateNote(c.Request.Context(), note)
+	id, err := s.store().CreateNote(c.Request.Context(), note)
 	if errors.Is(err, store.ErrConflict) {
 		respondError(c, http.StatusConflict, "SLUG_CONFLICT", "链接标识已被占用，请换一个")
 		return
@@ -123,7 +123,7 @@ func (s *Server) adminCreateNote(c *gin.Context) {
 		return
 	}
 
-	created, err := s.store.GetNoteByID(c.Request.Context(), id)
+	created, err := s.store().GetNoteByID(c.Request.Context(), id)
 	if err != nil {
 		respondError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "笔记已保存，读取失败")
 		return
@@ -148,7 +148,7 @@ func (s *Server) adminUpdateNote(c *gin.Context) {
 		return
 	}
 
-	existing, err := s.store.GetNoteByID(c.Request.Context(), id)
+	existing, err := s.store().GetNoteByID(c.Request.Context(), id)
 	if errors.Is(err, store.ErrNotFound) {
 		respondError(c, http.StatusNotFound, "NOT_FOUND", "笔记不存在")
 		return
@@ -167,7 +167,7 @@ func (s *Server) adminUpdateNote(c *gin.Context) {
 		return
 	}
 
-	if err := s.store.UpdateNote(c.Request.Context(), note); err != nil {
+	if err := s.store().UpdateNote(c.Request.Context(), note); err != nil {
 		switch {
 		case errors.Is(err, store.ErrConflict):
 			respondError(c, http.StatusConflict, "SLUG_CONFLICT", "链接标识已被占用，请换一个")
@@ -179,7 +179,7 @@ func (s *Server) adminUpdateNote(c *gin.Context) {
 		return
 	}
 
-	updated, err := s.store.GetNoteByID(c.Request.Context(), id)
+	updated, err := s.store().GetNoteByID(c.Request.Context(), id)
 	if err != nil {
 		respondError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "笔记已保存，读取失败")
 		return
@@ -192,7 +192,7 @@ func (s *Server) adminDeleteNote(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if err := s.store.DeleteNote(c.Request.Context(), id); err != nil {
+	if err := s.store().DeleteNote(c.Request.Context(), id); err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			respondError(c, http.StatusNotFound, "NOT_FOUND", "笔记不存在")
 			return

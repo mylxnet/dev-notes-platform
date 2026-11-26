@@ -7,12 +7,16 @@ import (
 	"io/fs"
 	"net/http"
 	"path"
+	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gin-gonic/gin"
 
 	"dev-notes-platform/internal/auth"
+	"dev-notes-platform/internal/backup"
 	"dev-notes-platform/internal/model"
 	"dev-notes-platform/internal/store"
 	"dev-notes-platform/internal/webui"
@@ -23,24 +27,60 @@ const maxAdminBody = 1 << 20
 
 // Server 持有 API 依赖。
 type Server struct {
-	store    *store.Store
+	db       *storeRef
 	auth     *auth.Manager
 	version  string
+	dataDir  string
+	dbPath   string
 	mediaDir string
+	// restoreMu 保证同一时间只有一个恢复流程在跑。
+	restoreMu sync.Mutex
+	// maintenance 为真时拒绝其余 API 请求，避免恢复替换文件期间读到半个库。
+	maintenance atomic.Bool
 }
 
-// New 构建 Gin 路由；mediaDir 是运行时上传图片的存放目录（通常为 DATA_DIR/media）。
-func New(st *store.Store, version string, sessions *auth.Manager, mediaDir string) *gin.Engine {
+// storeRef 让「从备份恢复」可以在不重启进程的前提下替换数据库连接。
+type storeRef struct {
+	mu sync.RWMutex
+	st *store.Store
+}
+
+func newStoreRef(st *store.Store) *storeRef { return &storeRef{st: st} }
+
+func (r *storeRef) get() *store.Store {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.st
+}
+
+func (r *storeRef) swap(next *store.Store) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.st = next
+}
+
+// store 返回当前数据库实例；恢复流程替换后，后续请求自动拿到新连接。
+func (s *Server) store() *store.Store { return s.db.get() }
+
+// New 构建 Gin 路由；dataDir 是数据目录（含 media/），dbPath 是数据库文件位置。
+func New(st *store.Store, version string, sessions *auth.Manager, dataDir, dbPath string) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
 	router.Use(gin.Recovery(), requestID(), securityHeaders())
 
-	server := &Server{store: st, auth: sessions, version: version, mediaDir: mediaDir}
+	server := &Server{
+		db:       newStoreRef(st),
+		auth:     sessions,
+		version:  version,
+		dataDir:  dataDir,
+		dbPath:   dbPath,
+		mediaDir: filepath.Join(dataDir, "media"),
+	}
 
 	router.GET("/healthz", server.health)
 	router.GET("/media/uploads/:name", server.serveUploadedMedia)
 
-	api := router.Group("/api")
+	api := router.Group("/api", server.maintenanceGuard())
 	api.GET("/projects", server.listProjects)
 	api.GET("/projects/:slug", server.getProject)
 	api.GET("/notes", server.listNotes)
@@ -50,8 +90,9 @@ func New(st *store.Store, version string, sessions *auth.Manager, mediaDir strin
 	// 登录不需要会话，也不校验 CSRF。
 	api.POST("/admin/login", bodyLimit(maxAdminBody), server.adminLogin)
 
+	// 每次请求都取当前连接，避免恢复替换后仍用已关闭的旧库。
 	loadAdmin := func(ctx context.Context, id int64) (*model.Admin, error) {
-		return st.GetAdminByID(ctx, id)
+		return server.store().GetAdminByID(ctx, id)
 	}
 	admin := api.Group("/admin",
 		bodyLimit(maxAdminBody),
@@ -77,6 +118,20 @@ func New(st *store.Store, version string, sessions *auth.Manager, mediaDir strin
 	admin.GET("/settings", server.adminGetSettings)
 	admin.PUT("/settings", server.adminUpdateSettings)
 
+	admin.GET("/backup/summary", server.adminBackupSummary)
+	admin.POST("/backup", server.adminCreateBackup)
+	admin.GET("/backup/snapshots", server.adminListSnapshots)
+	admin.POST("/backup/snapshots/:name/restore", server.adminRestoreSnapshot)
+
+	// 备份包上传走独立的请求体上限（包本身限制在 backup.MaxArchiveBytes）。
+	backupGroup := api.Group("/admin",
+		server.auth.RequireAdmin(loadAdmin),
+		server.csrfGuard(),
+		bodyLimit(backup.MaxArchiveBytes+(8<<20)),
+	)
+	backupGroup.POST("/backup/inspect", server.adminInspectBackup)
+	backupGroup.POST("/backup/restore", server.adminRestoreBackup)
+
 	// 上传单独放行更大的请求体（文件本身仍限制 2 MB），鉴权与 CSRF 与管理端一致。
 	upload := api.Group("/admin",
 		server.auth.RequireAdmin(loadAdmin),
@@ -88,6 +143,23 @@ func New(st *store.Store, version string, sessions *auth.Manager, mediaDir strin
 	router.NoRoute(noRouteHandler(webui.FS()))
 
 	return router
+}
+
+// maintenanceGuard 在恢复数据期间挡住其余接口，避免读到替换中的数据库。
+// 备份接口自身放行（恢复流程需要它们先完成校验与会话）。
+func (s *Server) maintenanceGuard() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if !s.maintenance.Load() {
+			c.Next()
+			return
+		}
+		if strings.HasPrefix(c.Request.URL.Path, "/api/admin/backup") {
+			c.Next()
+			return
+		}
+		c.Header("Retry-After", "3")
+		respondError(c, http.StatusServiceUnavailable, "MAINTENANCE", "正在恢复数据，请稍候重试")
+	}
 }
 
 // csrfGuard 校验管理端写操作的双提交 token。

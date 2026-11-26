@@ -58,12 +58,12 @@ func (s *Server) adminListProjects(c *gin.Context) {
 		Offset: (page - 1) * pageSize,
 	}
 
-	projects, err := s.store.ListAllProjects(c.Request.Context(), filter)
+	projects, err := s.store().ListAllProjects(c.Request.Context(), filter)
 	if err != nil {
 		respondError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "项目列表加载失败")
 		return
 	}
-	total, err := s.store.CountAllProjects(c.Request.Context())
+	total, err := s.store().CountAllProjects(c.Request.Context())
 	if err != nil {
 		respondError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "项目总数统计失败")
 		return
@@ -83,7 +83,7 @@ func (s *Server) adminCreateProject(c *gin.Context) {
 		return
 	}
 
-	id, err := s.store.CreateProject(c.Request.Context(), project)
+	id, err := s.store().CreateProject(c.Request.Context(), project)
 	if errors.Is(err, store.ErrConflict) {
 		respondError(c, http.StatusConflict, "SLUG_CONFLICT", "链接标识已被占用，请换一个")
 		return
@@ -93,7 +93,7 @@ func (s *Server) adminCreateProject(c *gin.Context) {
 		return
 	}
 
-	created, err := s.store.GetProjectByID(c.Request.Context(), id)
+	created, err := s.store().GetProjectByID(c.Request.Context(), id)
 	if err != nil {
 		respondError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "项目已保存，读取失败")
 		return
@@ -118,7 +118,7 @@ func (s *Server) adminUpdateProject(c *gin.Context) {
 		return
 	}
 
-	if err := s.store.UpdateProject(c.Request.Context(), project); err != nil {
+	if err := s.store().UpdateProject(c.Request.Context(), project); err != nil {
 		switch {
 		case errors.Is(err, store.ErrConflict):
 			respondError(c, http.StatusConflict, "SLUG_CONFLICT", "链接标识已被占用，请换一个")
@@ -130,7 +130,7 @@ func (s *Server) adminUpdateProject(c *gin.Context) {
 		return
 	}
 
-	updated, err := s.store.GetProjectByID(c.Request.Context(), id)
+	updated, err := s.store().GetProjectByID(c.Request.Context(), id)
 	if err != nil {
 		respondError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "项目已保存，读取失败")
 		return
@@ -143,7 +143,7 @@ func (s *Server) adminDeleteProject(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if err := s.store.DeleteProject(c.Request.Context(), id); err != nil {
+	if err := s.store().DeleteProject(c.Request.Context(), id); err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			respondError(c, http.StatusNotFound, "NOT_FOUND", "项目不存在")
 			return

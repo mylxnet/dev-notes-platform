@@ -6,6 +6,7 @@
 
 | 版本 | 日期 | 摘要 |
 |---|---|---|
+| v1.4.10 | 2026-11-27 | 新增数据备份与恢复后端能力：一键下载含媒体与清单的 `.tar.gz`、上传预检、恢复前自动快照与失败回滚、快照一键回滚，并补 6 个接口测试 |
 | v1.4.9 | 2026-11-26 | 推荐改为笔记字段：编辑页勾选「设为首页推荐」、列表加推荐徽标，首页「全部」进推荐全量列表，站点设置只留备案号 |
 | v1.4.8 | 2026-11-26 | 主题按钮窄屏收成圆形不再压表单、补 title 提示；修复生产 CSP 拦掉首屏主题脚本、WSL 下 Vite 不热更新 |
 | v1.4.7 | 2026-11-25 | 项目页改版：横向缩略图卡片（contain 以高为准、居中留空）、详情页图文并排，图片不再放大 |
@@ -44,6 +45,30 @@
 | v1.0.0 | 2026-11-17 | 初始设计方案 |
 
 ## 详细更新日志（按版本倒序）
+
+### v1.4.10 · 2026-11-27
+
+**新增**
+
+- 数据备份能力（后端）：`GET /api/admin/backup/summary` 返回库与媒体规模、内容数、schema 版本与已有快照；`POST /api/admin/backup` 现场打包数据库与媒体、写入 manifest 与 sha256 后以 `.tar.gz` 附件下发，服务器不留临时包。
+- 恢复能力（后端）：`POST /api/admin/backup/inspect` 只做预检（解包、校验 sha256、比对 schema 版本、检查图片是否齐全），不改动数据；`POST /api/admin/backup/restore` 需 `confirm=RESTORE`，覆盖前自动拍快照，任一步失败自动回滚，成功返回笔记/项目数、缺失图片与快照名。
+- 快照回滚：`GET /api/admin/backup/snapshots` 列出恢复前快照，`POST /api/admin/backup/snapshots/:name/restore` 一键回到恢复前状态；快照名按 `pre-restore-YYYYMMDD-HHMMSS.tar.gz` 白名单校验，杜绝路径穿越。
+- 备份/恢复测试：`app/internal/api/backup_test.go` 6 个端到端 HTTP 用例（未登录 401、缺 CSRF 403、概览与下载包预检、完整恢复链路含快照回滚、坏包拒绝、非 `.tar.gz` 拒绝），以及 `internal/backup` 与 `internal/store` 的配套单测。
+
+**优化**
+
+- `Server` 的数据库句柄改为可替换的 `storeRef`，恢复后直接换连接、无需重启进程；恢复期间 `maintenanceGuard` 拦截其余 API 并返回 503 + `Retry-After`，备份接口自身放行。
+- 测试复用 `api_admin_test.go` 的 `newAdminTestServer` / `login` / `doJSON` 与 `itoa`，不重复实现工具函数。
+
+**修复**
+
+- 删除新测试文件中重复声明的 `itoa`，避免与 `api_admin_test.go` 冲突导致编译失败。
+
+**调整**
+
+- 后台备份管理界面尚未接入正式前端，本版只提供 `prototype/backup.html` 原型；接口已可用，界面留待后续版本。
+- 版本升至 `v1.4.10`（`app/VERSION`、`app/main.go`、`web/package.json`、`web/package-lock.json`、`web/src/version.ts` 五处 + 文档）。
+- `deploy/docker-compose.yml` 镜像 tag 跟到 `1.4.10`；`1.4.10` 与 `latest` 已于 2026-11-27 推送阿里云（digest `sha256:1e7ae6c2…`）。
 
 ### v1.4.9 · 2026-11-26
 

@@ -47,7 +47,7 @@ func (s *Server) adminLogin(c *gin.Context) {
 		return
 	}
 
-	admin, err := s.store.GetAdminByUsername(c.Request.Context(), req.Username)
+	admin, err := s.store().GetAdminByUsername(c.Request.Context(), req.Username)
 	if err != nil || bcrypt.CompareHashAndPassword([]byte(admin.PasswordHash), []byte(req.Password)) != nil {
 		s.auth.RecordLoginFailure(clientKey)
 		// 不区分「账号不存在」与「密码错误」。
@@ -99,7 +99,7 @@ func (s *Server) adminChangePassword(c *gin.Context) {
 		return
 	}
 
-	if err := s.store.UpdateAdminPassword(c.Request.Context(), admin.ID, req.NewPassword); err != nil {
+	if err := s.store().UpdateAdminPassword(c.Request.Context(), admin.ID, req.NewPassword); err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			respondError(c, http.StatusNotFound, "NOT_FOUND", "管理员不存在")
 			return
@@ -109,7 +109,7 @@ func (s *Server) adminChangePassword(c *gin.Context) {
 	}
 
 	// 改密后 updated_at 变化会让旧会话失效，这里立即签发新会话，避免当前页面被踢出。
-	updated, err := s.store.GetAdminByUsername(c.Request.Context(), admin.Username)
+	updated, err := s.store().GetAdminByUsername(c.Request.Context(), admin.Username)
 	if err != nil {
 		respondError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "密码已更新，请重新登录")
 		return

@@ -1,8 +1,8 @@
 # 技术方案 · 我的开发笔记
 
-> v1.4.9 · by Mr lin · 2026-11-26
+> v1.4.10 · by Mr lin · 2026-11-27
 >
-> 依据：`doc/DESIGN.md` v1.4.9、已确认的 `prototype/` 第一版界面。本文档是后续编码、测试、部署的实施依据，代码实现与本文档不一致时，以本文档评审结论为准。
+> 依据：`doc/DESIGN.md` v1.4.10、已确认的 `prototype/` 第一版界面。本文档是后续编码、测试、部署的实施依据，代码实现与本文档不一致时，以本文档评审结论为准。
 
 ## 一、方案目标与范围
 
@@ -419,6 +419,12 @@ v1.3.0 实现位置：字段规则与词汇拦截在 `internal/validate`，渲�
 | PUT | `/api/admin/password` | 修改密码 |
 | GET | `/api/admin/notes/{id}` | 单篇笔记（含 Markdown 原文，编辑用） |
 | POST | `/api/admin/preview` | Markdown 预览，返回净化后的 HTML |
+| GET | `/api/admin/backup/summary` | 备份概览：`db_bytes`、`media_files`、`media_bytes`、`notes`、`projects`、`schema_version`、`snapshots`、`max_archive_bytes` |
+| POST | `/api/admin/backup` | 现场打包数据库与媒体、写 manifest 与 sha256，以 `.tar.gz` 附件下发；响应头带 `X-Backup-Notes` / `X-Backup-Media` |
+| POST | `/api/admin/backup/inspect` | multipart 上传预检，返回 `restorable`、`manifest`、`missing`、`problems`、`warnings`；不改动任何数据 |
+| POST | `/api/admin/backup/restore` | multipart 上传 + `confirm=RESTORE`；覆盖前自动拍快照，失败自动回滚；返回 `notes`、`projects`、`media_files`、`missing`、`snapshot`、`schema_version` |
+| GET | `/api/admin/backup/snapshots` | 列出 `pre-restore-YYYYMMDD-HHMMSS.tar.gz` 快照 |
+| POST | `/api/admin/backup/snapshots/{name}/restore` | 用服务器上的快照回滚；名字不匹配白名单返回 400，快照不存在返回 404 |
 
 状态码：
 
@@ -428,11 +434,14 @@ v1.3.0 实现位置：字段规则与词汇拦截在 `internal/validate`，渲�
 | 201 | 创建成功 |
 | 400 | 请求体格式错误 |
 | 401 | 未登录或会话失效 |
+| 403 | 缺 CSRF Token 或校验失败 |
 | 404 | 资源不存在或未公开 |
-| 409 | slug 冲突 |
-| 422 | 字段校验或内容拦截 |
+| 409 | slug 冲突；备份恢复期间已有恢复任务在执行（`RESTORE_BUSY`） |
+| 413 | 请求体超过上限（含备份包上传） |
+| 422 | 字段校验或内容拦截；备份包损坏或与当前 schema 不兼容（`BACKUP_INVALID` / `BACKUP_INCOMPATIBLE`） |
 | 429 | 登录失败次数过多 |
 | 500 | 服务端错误 |
+| 503 | 正在恢复数据，其余接口暂时拒绝（`MAINTENANCE`，带 `Retry-After`） |
 
 示例：笔记列表响应
 
@@ -655,8 +664,19 @@ services:
 
 ### 7.6 备份、升级、回滚
 
-- 备份：停止写入或使用 SQLite `.backup`，复制 `notes.db` 与 `-wal`、`-shm`。
-- 升级：备份数据库 → 拉取新镜像 → 重新创建容器 → 检查 `/healthz` 与前台。
+应用内备份（v1.4.10 起，接口已可用、后台界面待接入）：
+
+- 备份包是 `.tar.gz`，内含 `manifest.json`（格式 `dev-notes-backup/1`、程序版本、`schema_version`、创建时间、逐文件 sha256、内容统计）、`notes.db`（`VACUUM INTO` 一致性快照，含 WAL 未落盘数据）与 `media/<hash>.<ext>`。
+- 下载：`POST /api/admin/backup`（需 CSRF），服务器只留临时文件，响应结束即删。
+- 预检：`POST /api/admin/backup/inspect` 校验 sha256、包内条目白名单、schema 版本与图片齐全度，不改动任何数据。
+- 恢复：`POST /api/admin/backup/restore` 需 `confirm=RESTORE`；覆盖前自动把当前数据打成 `backups/pre-restore-YYYYMMDD-HHMMSS.tar.gz`，任一步失败自动回滚；成功后返回内容数、缺失图片与快照名。
+- 回滚：`GET /api/admin/backup/snapshots` 列快照，`POST /api/admin/backup/snapshots/{name}/restore` 一键回到恢复前状态。
+- 限制：单包不超过 500 MB；恢复期间其余 API 返回 503（`Retry-After: 3`），并发恢复返回 409。
+
+手工备份（容器外）：
+
+- 备份：停止写入或使用 SQLite `.backup`，复制 `notes.db` 与 `-wal`、`-shm`，连同 `media/` 一起保存。
+- 升级：备份数据目录 → 拉取新镜像 → 重新创建容器 → 检查 `/healthz` 与前台。
 - 回滚：切回上一版本镜像标签，重新创建容器；不跨版本降级数据库结构。
 - 迁移：启动时自动执行；迁移失败则拒绝启动，保留原数据库。
 
@@ -736,6 +756,7 @@ services:
 | v1 老库升级（v1.4.0） | 用 v1 建表语句造库并置 `user_version=1`，`Open` 后自动补 `description` / `cover_image` 两列，老数据保留、新列可写可读、重复打开不报错 |
 | 推荐笔记字段（v1.4.9） | 勾选 `is_featured` 后 `/api/notes?featured=1` 的 `total` 增一；`/api/site` 只下发前 3 条且按发布时间倒序；草稿即使勾选也不出现；取消推荐后两处立即移除 |
 | v3 老库升级推荐字段（v1.4.9） | 造 `user_version=3` 的库并写入 `settings.featured_notes`，`Open` 后对应笔记 `is_featured=1`、其他笔记不受影响，重复打开不重复迁移 |
+| 备份与恢复接口（v1.4.10） | 未登录 summary 返回 401、已登录缺 CSRF 下载返回 403；summary 含 `schema_version=4`，下载包 inspect 为 `restorable=true` 且无 problems/missing；恢复缺 `confirm` 返回 400，`confirm=RESTORE` 后前台数据恢复且返回快照名；快照列表含该快照，回滚后数据回到快照时点；坏包返回 422/400，非 `.tar.gz` 返回 400 |
 | 站点配置公开读取（v1.4.3） | `GET /api/site` 返回 `icp_number`；后台保存后公开接口立即读到新值；清空后为空串 |
 | 站点配置鉴权（v1.4.3） | 未登录 GET/PUT `/api/admin/settings` 返回 401；PUT 缺 CSRF 返回 403 |
 | 封面图上传（v1.4.4） | 合法 PNG 上传返回随机路径且可直接 GET 200；SVG/伪装文件/超限/未登录/缺 CSRF 被拒；非法文件名 404 |
@@ -910,6 +931,7 @@ ADMIN_PASSWORD=你的密码 MODE=update bash tools/import-notes.sh
 
 | 版本 | 日期 | 变更 |
 |---|---|---|
+| v1.4.10 | 2026-11-27 | 新增备份/恢复后端能力（`internal/backup` + `internal/api/backup.go` + `internal/store/backup.go`）：打包下载、上传预检、恢复前快照与失败回滚、快照回滚、维护期拦截；补 6 个端到端接口测试，前端界面待接入 |
 | v1.4.9 | 2026-11-26 | 推荐改为笔记字段（`is_featured`，schema 4）：编辑页勾选「设为首页推荐」、列表加推荐徽标，首页「全部」进 `/notes?featured=1` 全量推荐列表，站点设置只留备案号；旧推荐位自动回填 |
 | v1.4.8 | 2026-11-26 | 主题按钮窄屏收成 44px 圆形纯圆点、补 `title` 提示、后台窄屏留底部安全区；首屏主题脚本改为外部文件以符合生产 CSP；Vite 开轮询修复 WSL 不热更新 |
 | v1.4.7 | 2026-11-25 | 项目页改版：横向缩略图卡片、详情页图文并排、截图点击灯箱放大 |

@@ -32,11 +32,14 @@ func newAdminTestServer(t *testing.T) http.Handler {
 	return handler
 }
 
+// newAdminTestServerWithMedia 返回路由与数据目录；数据库在数据目录下，备份功能依赖这个布局。
 func newAdminTestServerWithMedia(t *testing.T) (http.Handler, string) {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 
-	st, err := store.Open(context.Background(), filepath.Join(t.TempDir(), "admin.db"))
+	dataDir := t.TempDir()
+	dbPath := filepath.Join(dataDir, "admin.db")
+	st, err := store.Open(context.Background(), dbPath)
 	if err != nil {
 		t.Fatalf("open store: %v", err)
 	}
@@ -46,8 +49,8 @@ func newAdminTestServerWithMedia(t *testing.T) (http.Handler, string) {
 		t.Fatalf("seed admin: %v", err)
 	}
 
-	mediaDir := filepath.Join(t.TempDir(), "media")
-	return New(st, "test", auth.NewManager(strings.Repeat("t", 32), auth.CookieSecureNever), mediaDir), mediaDir
+	return New(st, "test", auth.NewManager(strings.Repeat("t", 32), auth.CookieSecureNever), dataDir, dbPath),
+		dataDir
 }
 
 func doJSON(t *testing.T, router http.Handler, method, path, payload string, cookies []*http.Cookie, csrf string) *httptest.ResponseRecorder {
@@ -322,7 +325,7 @@ func TestAdminPasswordChangeInvalidatesOldSession(t *testing.T) {
 
 // TestMediaUpload 验证封面图上传的类型/大小校验、随机文件名与运行时下发。
 func TestMediaUpload(t *testing.T) {
-	router, mediaDir := newAdminTestServerWithMedia(t)
+	router, dataDir := newAdminTestServerWithMedia(t)
 	cookies, csrf := login(t, router)
 
 	// 1×1 透明 PNG
@@ -398,7 +401,7 @@ func TestMediaUpload(t *testing.T) {
 	if !regexp.MustCompile(`^/media/uploads/[a-f0-9]{32}\.png$`).MatchString(imagePath) {
 		t.Fatalf("unexpected image path: %q", imagePath)
 	}
-	if _, err := os.Stat(filepath.Join(mediaDir, strings.TrimPrefix(imagePath, "/media/uploads/"))); err != nil {
+	if _, err := os.Stat(filepath.Join(dataDir, "media", strings.TrimPrefix(imagePath, "/media/uploads/"))); err != nil {
 		t.Fatalf("uploaded file missing: %v", err)
 	}
 

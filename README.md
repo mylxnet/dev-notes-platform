@@ -111,7 +111,8 @@ cd web && npm install && npm run dev   # Vite 把 /api 代理到 127.0.0.1:8080
 
 ### 🔒 数据与隐私
 
-- 所有内容存在单个 SQLite 文件（默认 `/app/data/notes.db`），备份即复制文件。
+- 所有内容存在单个 SQLite 文件（默认 `/app/data/notes.db`），手工备份即复制文件与 `media/` 目录。
+- v1.4.10 起内置备份/恢复接口：可下载含数据库与图片的 `.tar.gz`（带清单与逐文件 sha256）、上传预检、恢复前自动快照与快照回滚；后台界面接入前可直接调用 `/api/admin/backup/*`。
 - 前台无统计脚本、无第三方 CDN、无外部字体、无 Cookie 追踪。
 - 后台为单管理员账号，密码用 bcrypt 哈希存储，明文不落库、不进日志。
 - 会话用 `HttpOnly` 签名 Cookie（`SameSite=Lax`，12 小时），写操作需 CSRF token；连续 5 次密码错误锁定 15 分钟。
@@ -205,7 +206,7 @@ dev-notes-platform/
 
 ### 📜 更新日志
 
-当前版本 **v1.4.9**（Section 3 已完成；Section 4 进行中：8 个项目、31 篇笔记，均为真实技术复盘，项目卡片指向真实源码仓库）。
+当前版本 **v1.4.10**（Section 3 已完成；Section 4 进行中：8 个项目、31 篇笔记，均为真实技术复盘，项目卡片指向真实源码仓库）。
 
 逐版本明细详见 [CHANGELOG.md](CHANGELOG.md)。
 

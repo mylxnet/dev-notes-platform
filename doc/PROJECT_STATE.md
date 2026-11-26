@@ -1,12 +1,33 @@
 # 项目状态 · 我的开发笔记
 
-> v1.4.9 · by Mr lin · 2026-11-26
+> v1.4.10 · by Mr lin · 2026-11-27
 
 ## 当前版本
 
-v1.4.9 · Section 3 已完成，Section 4 进行中：8 个项目共 31 篇，全部为真实技术复盘。数据库结构版本 `schemaVersion = 4`（`note` 新增 `is_featured` 推荐字段）。Section 5 部署：Docker 构建链就绪，`1.4.8` / `1.4.9` 镜像均已推送阿里云，`1.4.9` 已通过容器端到端冒烟；1Panel 上机待 ICP 备案通过。
+v1.4.10 · Section 3 已完成，Section 4 进行中：8 个项目共 31 篇，全部为真实技术复盘。数据库结构版本 `schemaVersion = 4`（`note` 含 `is_featured` 推荐字段）。Section 5 部署：Docker 构建链就绪，`1.4.8` / `1.4.9` / `1.4.10` 镜像均已推送阿里云；1Panel 上机待 ICP 备案通过。
 
-**当前 `app/build/dev-notes` 是 `bash scripts/build.sh` 产出的正式包**（v1.4.9，明文凭据计数 0，可对外发）：需要一键登录的本机验收包用 `scripts/build-test.sh` 单独产出（计数 1），用完覆盖回正式包，测试包不得外发。本机验收数据用 `deploy/data` 的副本（WSL 重启会清空 `/tmp`，原来的 `/tmp/dn-dev` 已不可靠）。
+**当前 `app/build/dev-notes` 是 `bash scripts/build.sh` 产出的正式包**（v1.4.10，明文凭据计数 0，可对外发）：需要一键登录的本机验收包用 `scripts/build-test.sh` 单独产出（计数 1），用完覆盖回正式包，测试包不得外发。本机验收数据用 `deploy/data` 的副本（WSL 重启会清空 `/tmp`，原来的 `/tmp/dn-dev` 已不可靠）。
+
+## 本轮改动记录（v1.4.10，2026-11-27）
+
+- 新增备份/恢复后端能力：`internal/backup` 负责打包（数据库 + 媒体 + manifest + sha256）、解包预检与落盘替换；`internal/api/backup.go` 暴露概览、下载、预检、恢复、快照列表与快照回滚 6 个接口；`internal/store/backup.go` 提供内容统计、schema 版本与媒体引用查询。
+- 恢复流程内建安全网：`confirm=RESTORE` 二次确认、恢复前自动快照、任一步失败自动回滚、`maintenanceGuard` 在恢复期间拦截其余 API（503 + `Retry-After`），并发恢复用 `restoreMu` 拒绝第二个请求。
+- `Server` 的库句柄从固定指针改为可替换的 `storeRef`（`s.store` → `s.store()`），恢复后换连接、不重启进程。
+- 新增 `app/internal/api/backup_test.go`，为上述接口补齐 6 个端到端 HTTP 用例：未登录 401、缺 CSRF 403、概览与下载包预检、完整恢复链路（含恢复前快照与回滚）、坏包拒绝、非 `.tar.gz` 拒绝。
+- 修复新测试文件与 `api_admin_test.go` 重复声明 `itoa` 的编译冲突，改为复用既有函数。
+- 后台备份管理界面未接入正式前端，本版只留 `prototype/backup.html` 原型，接口先行。
+
+### 验收证据（v1.4.10，2026-11-27）
+
+- `go test ./internal/api/ -run 'Backup|Restore' -v`：6 个用例全部 PASS，包耗时 5.337s。
+- `go test ./...`：`internal/api` 20.292s、`internal/backup` 4.228s、`internal/store` 9.391s，其余包全绿。
+- `gofmt -l internal/api/` 无输出；`go vet ./internal/api/` 通过。
+- 覆盖的接口：`GET /api/admin/backup/summary`、`POST /api/admin/backup`、`POST /api/admin/backup/inspect`、`POST /api/admin/backup/restore`、`GET /api/admin/backup/snapshots`、`POST /api/admin/backup/snapshots/:name/restore`。
+- 打包：`bash scripts/build.sh` 通过五处版本校验，`vite build` 2.92s（108 模块），后端 `-tags embedui` 静态编译完成；`app/build/dev-notes` 实跑 `/healthz` = `{"db":"ok","status":"ok","version":"1.4.10"}`，首页 200。
+- 发包（2026-11-27）：`bash scripts/push-image.sh` RC=0，`1.4.10` 与 `latest` 推送阿里云，digest 同为 `sha256:1e7ae6c2…`，manifest `application/vnd.oci.image.manifest.v1+json`（无 OCI 空 manifest）。
+- 镜像端到端：用推送的 `1.4.10` 起容器（`-p 18091:8080`，挂 `deploy/data` 副本并 `chown -R 100:101`），状态 `Up (healthy)`，`/healthz` 返回 `1.4.10`，`/api/notes` 正常返回已有数据。
+
+## 上一轮改动记录（v1.4.9，2026-11-26）
 
 ## 本轮改动记录（v1.4.9，2026-11-26）
 
@@ -17,7 +38,7 @@ v1.4.9 · Section 3 已完成，Section 4 进行中：8 个项目共 31 篇，�
 - 决策记录：上一版把推荐做成「站点设置三个下拉选 slug」，复盘认为推荐本质是笔记属性，改成字段后不必跨页记忆标题，也能在列表里一眼看出谁被推荐（用户明确要求）。
 - 已执行 `bash scripts/build.sh` 打包（`app/build/dev-notes` = v1.4.9），并执行 `bash scripts/push-image.sh` 把 `1.4.9` 与 `latest` 推到阿里云。
 
-### 验收证据（v1.4.9，2026-11-26）
+### 上一轮验收证据（v1.4.9，2026-11-26）
 
 - `go test ./...` 全绿（`api` 含改写后的 `TestSiteFeaturedNotes`：勾选后 `featured=1` 的 `total` 4 篇、首页仅 3 条且按时间倒序、草稿不出现、取消推荐后掉回 3 篇、`featured_slugs` 被忽略）。
 - `go test ./internal/store` 新增 `TestMigrateFeaturedBackfill`：造 `user_version=3` 库并写入 `settings.featured_notes`，`Open` 后对应笔记 `is_featured=1`、另一篇仍为 0，重复打开不报错。
@@ -28,12 +49,12 @@ v1.4.9 · Section 3 已完成，Section 4 进行中：8 个项目共 31 篇，�
 - 镜像端到端：用推送的 `1.4.9` 起容器（`-p 18086:8080`，挂 `deploy/data` 副本并 `chown -R 100:101`），状态 `Up (healthy)`，`/healthz` = `1.4.9`；容器内库自动迁到 `user_version=4`、`note` 有 `is_featured` 列；浏览器勾选「踩的循环的坑」后首页面板出现 1 条、「全部」进 `/notes?featured=1` 共 1 篇；控制台 0 报错。
 - Git：提交 `aa022aa`，已推送 `origin/main`（`d71dbc8..aa022aa`）。
 
-### 本轮踩坑（v1.4.9）
+### 上一轮踩坑（v1.4.9）
 
 - **`npm ci` 会打断正在运行的 Vite**：打包脚本第一步删 `node_modules` 重装，正在 dev 的页面随后点「用标题生成」报「生成失败，请手动填写链接标识」。根因是 `slug.ts` 用 `import('pinyin-pro')` 动态加载，依赖被换掉后取不到模块，异常落到 catch 提示。现象上极像代码 bug，实际是环境被换。教训：给正在验收的 dev server 打包前先停 dev server；或联调期改用 `npm run build`（不重装依赖）。排查手段：看 Vite 日志 + 复现脚本抓控制台报错，控制台为空即说明不是前端代码问题。
 - **残留进程占端口 → 数据看起来「全丢了」**：`8080` 被 53 分钟前启动的 `/tmp/dn-cc-bin`（挂空库 `/tmp/dn-cc`）占着，新后端 `bind: address already in use` 静默退出，前台查到 0 篇笔记、首页推荐面板按设计隐藏、后台推荐位无候选。教训：启动服务后必须核对 `/healthz` 的版本号与端口占用者（`ss -lptn 'sport = :8080'`、`tr '\0' '\n' < /proc/<pid>/environ | grep DATA_DIR`），不能只看 `curl` 有响应就认为服务是自己起的。
 
-## 上一轮改动记录（v1.4.8，2026-11-26）
+## 历史改动记录（v1.4.8，2026-11-26）
 
 - 主题按钮重做：桌面端保留「浅色主题」长文案并补 `title` 提示；≤640px 收成 44×44 圆形按钮、只留状态圆点，桌面/窄屏都不再压住右下角表单控件。
 - 主题改为三态：跟随系统（默认，监听 `prefers-color-scheme`）/ 浅色 / 深色，点击浮动按钮循环切换；旧键 `dev-notes-theme` 迁移到 `dev-notes-theme-mode`。
@@ -44,7 +65,7 @@ v1.4.9 · Section 3 已完成，Section 4 进行中：8 个项目共 31 篇，�
 - 修复既有的窄屏问题：≤640px 时后台页头按钮被压成竖排文字（`.admin-heading` 改纵向堆叠、按钮 `white-space: nowrap`、`.row-actions` 允许换行）。
 - 本轮已执行 `bash scripts/build.sh` 打包，`app/build/dev-notes` 为 v1.4.8 正式包；`bash scripts/push-image.sh` 已把 `1.4.8` 与 `latest` 推到阿里云。
 
-### 上一轮验收证据（v1.4.8，2026-11-26）
+### 历史验收证据（v1.4.8，2026-11-26）
 
 - 无头 Chromium（390×900 / 1280×900）跑 `test/theme_button_check.py`：390px 按钮 44×44、`border-radius: 50%`、文本长度 0、圆点居中偏差 0px、`title` =「当前为跟随系统，点击切换」；点一次后 `title` 变「当前为浅色，点击切换」、`data-theme="light"`。
 - 遮挡检查（滚到底、真实矩形相交）：公开 `/`、`/projects`、`/about` 与后台 `/admin/notes`、`/admin/notes/new`、`/admin/projects`、`/admin/settings`、`/admin/account` 全部 `[]`，横向溢出 0px。
@@ -55,7 +76,7 @@ v1.4.9 · Section 3 已完成，Section 4 进行中：8 个项目共 31 篇，�
 - 云端镜像端到端：用推送后的 `1.4.8` 起容器（`-p 18085:8080`，挂 `deploy/data` 副本并 `chown -R 100:101`），状态 `Up (healthy)`，`/healthz` 返回 `{"db":"ok","status":"ok","version":"1.4.8"}`，首页 `200`、`/theme-init.js` `200`；对容器跑 `test/theme_button_check.py` 全部通过（44×44、无遮挡、CSP 报错 0）。
 - Git：提交 `b60b34e`，已推送 `origin/main`（`585d998..b60b34e`）。
 
-### 上一轮踩坑（v1.4.8）
+### 历史踩坑（v1.4.8）
 
 - **Vite 在 WSL 下不热更新**：现象是改完 `ThemeSwitch.vue` 模板后，浏览器仍拿到旧组件（`title` 取不到、仍是 `theme-short`），但文件内容已是新版。根因：源码在 `/mnt/e`（Windows drvfs 挂载），inotify 事件不会传进 WSL，Vite 的 watcher 收不到变更，继续返回缓存的 transform 结果。定位方式：直接 `curl http://127.0.0.1:5173/src/components/ThemeSwitch.vue` 看服务端返回的模块，发现仍是旧代码。修复：`vite.config.ts` 加 `server.watch.usePolling: true, interval: 300`。教训：在 `/mnt/` 下开发必须开轮询，否则「改了没生效」会误判成代码问题；同时避免同时留多个 vite 进程抢同一端口。
 - **生产 CSP 拦掉内联主题脚本**：现象是正式包里控制台报 `Executing inline script violates the following Content Security Policy directive 'script-src 'self''`，首屏防闪烁失效。根因：`app/internal/api/router.go` 的 `securityHeaders()` 只放行 `script-src 'self'`，而 `index.html` 用的是内联 `<script>`。修复：脚本迁到 `web/public/theme-init.js`，用 `<script src="/theme-init.js">` 同步加载（`public/` 下的文件不带哈希、不享长缓存，改完即时生效）。教训：Vite 的 `index.html` 内联脚本在 dev 下正常、生产被 CSP 拦，验收必须对**构建产物**再跑一遍，不能只测 dev server。
@@ -642,7 +663,7 @@ v1.4.9 · Section 3 已完成，Section 4 进行中：8 个项目共 31 篇，�
 4. `mailhub-imap-cursor.svg` 仍未在任何文章中被引用（`siteguard-origin.svg` 已随 `reverse-proxy-origin-403` 上线）；本轮 3 篇纯文字，没有插图
 5. `tools/import-notes.sh` 目前只处理新建与更新，未做正文配图上传（插图仍走 `web/public/media/`）
 6. 项目元数据（名称/摘要/技术栈/说明/封面路径）只存在于数据库，重建开发库要手工补录；考虑加一份 `content/projects.json` + 入库脚本，避免下次重来
-7. Section 5：Docker 构建链已就绪，`1.4.6` / `1.4.7` / `1.4.8` / `1.4.9` 镜像均在阿里云，`1.4.9` 已通过本地容器冒烟。待办是 1Panel 上机部署与浏览器验收（需 ICP 备案通过后再开放）
+7. Section 5：Docker 构建链已就绪，`1.4.6` / `1.4.7` / `1.4.8` / `1.4.9` / `1.4.10` 镜像均在阿里云，`1.4.10` 已通过本地容器冒烟。待办是 1Panel 上机部署与浏览器验收（需 ICP 备案通过后再开放）
 8. 每个 Section 完成后升小版本、同步文档并提交
 
 ## 版本一致性检查
@@ -651,11 +672,11 @@ v1.4.9 · Section 3 已完成，Section 4 进行中：8 个项目共 31 篇，�
 
 | 位置 | 当前值 |
 |---|---|
-| `app/VERSION` / `app/main.go` | `1.4.9` |
-| `web/package.json` / `web/package-lock.json` | `1.4.9` |
-| `web/src/version.ts` | `APP_VERSION = '1.4.9'` |
-| `web/src/views/AboutView.vue` / 后台侧栏 / 登录页 | `{{ VERSION_LINE }}` → `v1.4.9 by Mr lin` |
-| `doc/*.md` / `README.md` / `CHANGELOG.md` / `deploy/docker-compose.yml` 镜像 tag | `v1.4.9` |
+| `app/VERSION` / `app/main.go` | `1.4.10` |
+| `web/package.json` / `web/package-lock.json` | `1.4.10` |
+| `web/src/version.ts` | `APP_VERSION = '1.4.10'` |
+| `web/src/views/AboutView.vue` / 后台侧栏 / 登录页 | `{{ VERSION_LINE }}` → `v1.4.10 by Mr lin` |
+| `doc/*.md` / `README.md` / `CHANGELOG.md` / `deploy/docker-compose.yml` 镜像 tag | `v1.4.10` |
 
 `scripts/build.sh` 在编译前校验 `app/main.go` 的 `var version` 与 `app/VERSION` 一致，不一致直接失败。原型工程 `prototype/` 仍为 `v1.0.3`，作为冻结基线不再跟随版本。
 

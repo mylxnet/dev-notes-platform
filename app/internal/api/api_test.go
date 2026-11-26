@@ -19,7 +19,9 @@ import (
 
 func newTestServer(t *testing.T) http.Handler {
 	t.Helper()
-	st, err := store.Open(context.Background(), filepath.Join(t.TempDir(), "api.db"))
+	dataDir := t.TempDir()
+	dbPath := filepath.Join(dataDir, "api.db")
+	st, err := store.Open(context.Background(), dbPath)
 	if err != nil {
 		t.Fatalf("open store: %v", err)
 	}
@@ -64,7 +66,7 @@ func newTestServer(t *testing.T) http.Handler {
 		t.Fatalf("create draft note: %v", err)
 	}
 
-	return New(st, "test", auth.NewManager(strings.Repeat("t", 32), auth.CookieSecureNever), filepath.Join(t.TempDir(), "media"))
+	return New(st, "test", auth.NewManager(strings.Repeat("t", 32), auth.CookieSecureNever), dataDir, dbPath)
 }
 
 func TestHealth(t *testing.T) {
