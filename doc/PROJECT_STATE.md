@@ -4,7 +4,7 @@
 
 ## 当前版本
 
-v1.4.9 · Section 3 已完成，Section 4 进行中：8 个项目共 31 篇，全部为真实技术复盘。数据库结构版本 `schemaVersion = 4`（`note` 新增 `is_featured` 推荐字段）。Section 5 部署：Docker 构建链就绪，`1.4.7` / `1.4.8` 镜像已推送阿里云并通过容器冒烟，`1.4.9` 镜像待推送；1Panel 上机待 ICP 备案通过。
+v1.4.9 · Section 3 已完成，Section 4 进行中：8 个项目共 31 篇，全部为真实技术复盘。数据库结构版本 `schemaVersion = 4`（`note` 新增 `is_featured` 推荐字段）。Section 5 部署：Docker 构建链就绪，`1.4.8` / `1.4.9` 镜像均已推送阿里云，`1.4.9` 已通过容器端到端冒烟；1Panel 上机待 ICP 备案通过。
 
 **当前 `app/build/dev-notes` 是 `bash scripts/build.sh` 产出的正式包**（v1.4.9，明文凭据计数 0，可对外发）：需要一键登录的本机验收包用 `scripts/build-test.sh` 单独产出（计数 1），用完覆盖回正式包，测试包不得外发。本机验收数据用 `deploy/data` 的副本（WSL 重启会清空 `/tmp`，原来的 `/tmp/dn-dev` 已不可靠）。
 
@@ -15,13 +15,18 @@ v1.4.9 · Section 3 已完成，Section 4 进行中：8 个项目共 31 篇，�
 - 站点设置精简为只维护 ICP 备案号，附「去笔记管理勾选推荐」的引导链接。
 - 迁移回填：旧 `settings.featured_notes` 里的推荐位自动写成 `is_featured = 1`，此前配的 3 篇不丢；旧值缺失或 JSON 损坏按未配置跳过。
 - 决策记录：上一版把推荐做成「站点设置三个下拉选 slug」，复盘认为推荐本质是笔记属性，改成字段后不必跨页记忆标题，也能在列表里一眼看出谁被推荐（用户明确要求）。
+- 已执行 `bash scripts/build.sh` 打包（`app/build/dev-notes` = v1.4.9），并执行 `bash scripts/push-image.sh` 把 `1.4.9` 与 `latest` 推到阿里云。
 
 ### 验收证据（v1.4.9，2026-11-26）
 
 - `go test ./...` 全绿（`api` 含改写后的 `TestSiteFeaturedNotes`：勾选后 `featured=1` 的 `total` 4 篇、首页仅 3 条且按时间倒序、草稿不出现、取消推荐后掉回 3 篇、`featured_slugs` 被忽略）。
 - `go test ./internal/store` 新增 `TestMigrateFeaturedBackfill`：造 `user_version=3` 库并写入 `settings.featured_notes`，`Open` 后对应笔记 `is_featured=1`、另一篇仍为 0，重复打开不报错。
 - 浏览器端到端（无头 Chromium，1280×900）：库 `user_version=4`、迁移回填 3 条；后台列表徽标 3 个；勾选一条已发布笔记后推荐数 3 → 4、徽标 4 个；首页面板 3 条且都在推荐集合内；点「全部」跳 `/notes?featured=1`、标题「推荐笔记」、卡片 4 张「共 4 篇」；点「仅看推荐 ✕」回 `/notes`、标题回「笔记列表」；站点设置 `select` 数 0；取消推荐后回到 3；控制台 0 报错。
-- 排版自检：推荐开关在 1280px 为「☐ 设为首页推荐 + 说明」单行，390px 下勾选框在左、说明换行不溢出。
+- 排版自检：推荐开关在 1280px 为「☐ 设为首页推荐 + 说明」单行，390px 下勾选框在左、说明换行不溢出；390px 推荐列表「共 N 篇」单行不拆（`.list-count { flex: none; white-space: nowrap }`）。
+- 正式包（`:8080`，内嵌构建）：首页面板 3 条 → 「全部」`/notes?featured=1`「推荐笔记」共 3 篇 → 取消筛选回 `/notes` 6 张卡片；390px 横向溢出 0；后台徽标 3、设置页 `select` 0、编辑页推荐开关 1；控制台 0 报错。
+- 发包（2026-11-26）：`bash scripts/push-image.sh` 推送 `1.4.9` + `latest` 到阿里云，`1.4.9` manifest digest `sha256:5fabada4…`、`latest` digest `sha256:16e2ecb3…`，media type `application/vnd.oci.image.manifest.v1+json`，无 OCI 空 manifest。
+- 镜像端到端：用推送的 `1.4.9` 起容器（`-p 18086:8080`，挂 `deploy/data` 副本并 `chown -R 100:101`），状态 `Up (healthy)`，`/healthz` = `1.4.9`；容器内库自动迁到 `user_version=4`、`note` 有 `is_featured` 列；浏览器勾选「踩的循环的坑」后首页面板出现 1 条、「全部」进 `/notes?featured=1` 共 1 篇；控制台 0 报错。
+- Git：提交 `aa022aa`，已推送 `origin/main`（`d71dbc8..aa022aa`）。
 
 ### 本轮踩坑（v1.4.9）
 
@@ -637,7 +642,7 @@ v1.4.9 · Section 3 已完成，Section 4 进行中：8 个项目共 31 篇，�
 4. `mailhub-imap-cursor.svg` 仍未在任何文章中被引用（`siteguard-origin.svg` 已随 `reverse-proxy-origin-403` 上线）；本轮 3 篇纯文字，没有插图
 5. `tools/import-notes.sh` 目前只处理新建与更新，未做正文配图上传（插图仍走 `web/public/media/`）
 6. 项目元数据（名称/摘要/技术栈/说明/封面路径）只存在于数据库，重建开发库要手工补录；考虑加一份 `content/projects.json` + 入库脚本，避免下次重来
-7. Section 5：Docker 构建链已就绪，`1.4.6` / `1.4.7` / `1.4.8` 镜像均在阿里云，`1.4.8` 已通过本地容器冒烟；`1.4.9` 只出了本地二进制，镜像待推送。待办是 1Panel 上机部署与浏览器验收（需 ICP 备案通过后再开放）
+7. Section 5：Docker 构建链已就绪，`1.4.6` / `1.4.7` / `1.4.8` / `1.4.9` 镜像均在阿里云，`1.4.9` 已通过本地容器冒烟。待办是 1Panel 上机部署与浏览器验收（需 ICP 备案通过后再开放）
 8. 每个 Section 完成后升小版本、同步文档并提交
 
 ## 版本一致性检查

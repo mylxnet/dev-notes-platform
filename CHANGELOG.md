@@ -66,6 +66,7 @@
 
 - `GET /api/notes` 新增 `featured=1` 筛选；`/api/site` 的 `featured_notes` 改为查笔记字段；`PUT /api/admin/settings` 只接受 `icp_number`，传 `featured_slugs` 会被忽略。
 - 版本升至 `v1.4.9`（`app/VERSION`、`app/main.go`、`web/package.json`、`web/package-lock.json`、`web/src/version.ts` 五处 + 文档）。
+- `deploy/docker-compose.yml` 镜像 tag 跟到 `1.4.9`；`1.4.9` 与 `latest` 已于 2026-11-26 推送阿里云（`scripts/push-image.sh`）。
 
 **验收证据（2026-11-26，无头 Chromium）**
 
@@ -79,6 +80,7 @@
 | 站点设置页 | `select` 数量 0，只剩「ICP 备案号」 |
 | 取消推荐 | 推荐数回到 3，首页与推荐列表同步移除 |
 | 控制台 | 0 报错 |
+| 镜像发包 | `1.4.9` + `latest` 已推阿里云；容器 `Up (healthy)`，`/healthz` = `1.4.9`，库自动迁到 `user_version=4`，勾选推荐后首页面板与「全部」列表均正常 |
 
 ### v1.4.8 · 2026-11-26
 
