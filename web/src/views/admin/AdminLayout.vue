@@ -56,6 +56,7 @@ async function onLogout() {
         <RouterLink to="/admin/projects">项目管理</RouterLink>
         <RouterLink to="/admin/account">账号设置</RouterLink>
         <RouterLink to="/admin/settings">站点设置</RouterLink>
+        <RouterLink to="/admin/backup">数据备份</RouterLink>
       </nav>
       <div class="admin-side-note">
         {{ VERSION_LINE }}<br />

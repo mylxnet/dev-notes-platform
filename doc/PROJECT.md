@@ -1,8 +1,8 @@
 # 技术方案 · 我的开发笔记
 
-> v1.4.10 · by Mr lin · 2026-11-27
+> v1.4.11 · by Mr lin · 2026-11-27
 >
-> 依据：`doc/DESIGN.md` v1.4.10、已确认的 `prototype/` 第一版界面。本文档是后续编码、测试、部署的实施依据，代码实现与本文档不一致时，以本文档评审结论为准。
+> 依据：`doc/DESIGN.md` v1.4.11、已确认的 `prototype/` 第一版界面。本文档是后续编码、测试、部署的实施依据，代码实现与本文档不一致时，以本文档评审结论为准。
 
 ## 一、方案目标与范围
 
@@ -664,7 +664,7 @@ services:
 
 ### 7.6 备份、升级、回滚
 
-应用内备份（v1.4.10 起，接口已可用、后台界面待接入）：
+应用内备份（v1.4.11 起，后台「数据备份」页面可直接操作）：
 
 - 备份包是 `.tar.gz`，内含 `manifest.json`（格式 `dev-notes-backup/1`、程序版本、`schema_version`、创建时间、逐文件 sha256、内容统计）、`notes.db`（`VACUUM INTO` 一致性快照，含 WAL 未落盘数据）与 `media/<hash>.<ext>`。
 - 下载：`POST /api/admin/backup`（需 CSRF），服务器只留临时文件，响应结束即删。
@@ -757,6 +757,8 @@ services:
 | 推荐笔记字段（v1.4.9） | 勾选 `is_featured` 后 `/api/notes?featured=1` 的 `total` 增一；`/api/site` 只下发前 3 条且按发布时间倒序；草稿即使勾选也不出现；取消推荐后两处立即移除 |
 | v3 老库升级推荐字段（v1.4.9） | 造 `user_version=3` 的库并写入 `settings.featured_notes`，`Open` 后对应笔记 `is_featured=1`、其他笔记不受影响，重复打开不重复迁移 |
 | 备份与恢复接口（v1.4.10） | 未登录 summary 返回 401、已登录缺 CSRF 下载返回 403；summary 含 `schema_version=4`，下载包 inspect 为 `restorable=true` 且无 problems/missing；恢复缺 `confirm` 返回 400，`confirm=RESTORE` 后前台数据恢复且返回快照名；快照列表含该快照，回滚后数据回到快照时点；坏包返回 422/400，非 `.tar.gz` 返回 400 |
+| 备份页浏览器链路（v1.4.11） | `test/backup_page_check.py`：侧栏进入 `/admin/backup`、统计卡 3 张；点「生成备份包」触发真实下载（`.tar.gz`，>200 KB）；把该包重新上传显示「预检通过」；输入 `RESTORE` 后显示「恢复完成」及笔记/项目/图片数与恢复前快照名；控制台 0 报错 |
+| 备份页窄屏（v1.4.11） | `test/backup_narrow_check.py`（390×900）：横向溢出 0；统计卡单列；「回滚」按钮 64×46 不换行；控制台 0 报错 |
 | 站点配置公开读取（v1.4.3） | `GET /api/site` 返回 `icp_number`；后台保存后公开接口立即读到新值；清空后为空串 |
 | 站点配置鉴权（v1.4.3） | 未登录 GET/PUT `/api/admin/settings` 返回 401；PUT 缺 CSRF 返回 403 |
 | 封面图上传（v1.4.4） | 合法 PNG 上传返回随机路径且可直接 GET 200；SVG/伪装文件/超限/未登录/缺 CSRF 被拒；非法文件名 404 |
@@ -931,7 +933,8 @@ ADMIN_PASSWORD=你的密码 MODE=update bash tools/import-notes.sh
 
 | 版本 | 日期 | 变更 |
 |---|---|---|
-| v1.4.10 | 2026-11-27 | 新增备份/恢复后端能力（`internal/backup` + `internal/api/backup.go` + `internal/store/backup.go`）：打包下载、上传预检、恢复前快照与失败回滚、快照回滚、维护期拦截；补 6 个端到端接口测试，前端界面待接入 |
+| v1.4.11 | 2026-11-27 | 后台接入「数据备份」页面（`/admin/backup`）：概览统计、生成并下载备份包、恢复前快照回滚、拖拽预检、`RESTORE` 确认恢复与自检；修复窄屏快照表按钮变形 |
+| v1.4.10 | 2026-11-27 | 新增备份/恢复后端能力（`internal/backup` + `internal/api/backup.go` + `internal/store/backup.go`）：打包下载、上传预检、恢复前快照与失败回滚、快照回滚、维护期拦截；补 6 个端到端接口测试 |
 | v1.4.9 | 2026-11-26 | 推荐改为笔记字段（`is_featured`，schema 4）：编辑页勾选「设为首页推荐」、列表加推荐徽标，首页「全部」进 `/notes?featured=1` 全量推荐列表，站点设置只留备案号；旧推荐位自动回填 |
 | v1.4.8 | 2026-11-26 | 主题按钮窄屏收成 44px 圆形纯圆点、补 `title` 提示、后台窄屏留底部安全区；首屏主题脚本改为外部文件以符合生产 CSP；Vite 开轮询修复 WSL 不热更新 |
 | v1.4.7 | 2026-11-25 | 项目页改版：横向缩略图卡片、详情页图文并排、截图点击灯箱放大 |

@@ -1686,6 +1686,270 @@ tbody tr:hover {
   }
 }
 
+/* 数据备份页：统计卡、不确定进度、拖拽区与校验清单 */
+.backup-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin: 0 0 22px;
+}
+
+.backup-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.backup-stat-k {
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.backup-stat-v {
+  font-size: 1.35rem;
+  line-height: 1.3;
+}
+
+.backup-stat-n {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.backup-panel {
+  padding: 20px 22px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  margin-bottom: 20px;
+}
+
+.backup-panel .panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.backup-panel h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.backup-panel code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.86em;
+}
+
+/* 快照表：窄屏改为横向滚动，避免文件名与按钮被压成逐字换行 */
+.backup-panel .table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.backup-panel table {
+  min-width: 560px;
+}
+
+.backup-panel td code,
+.backup-panel td.muted {
+  white-space: nowrap;
+}
+
+.backup-panel td:last-child .btn {
+  white-space: nowrap;
+}
+
+.backup-progress {
+  margin: 14px 0 4px;
+}
+
+.backup-progress-line {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.82rem;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.backup-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.backup-bar i {
+  display: block;
+  width: 40%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  animation: backup-slide 1.1s ease-in-out infinite;
+}
+
+@keyframes backup-slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(250%);
+  }
+}
+
+.backup-result {
+  margin-top: 12px;
+  font-size: 0.88rem;
+}
+
+.backup-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 26px 18px;
+  border: 1px dashed var(--border);
+  border-radius: 14px;
+  background: var(--surface-2);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.backup-drop:hover,
+.backup-drop-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.backup-drop-disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.backup-drop span {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.backup-file {
+  display: none;
+}
+
+.backup-picked {
+  margin-top: 16px;
+}
+
+.backup-picked-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.backup-checks {
+  display: grid;
+  gap: 4px;
+  margin: 6px 0 14px;
+  padding-left: 18px;
+  font-size: 0.86rem;
+  color: var(--muted);
+}
+
+.backup-check-bad {
+  color: var(--red);
+}
+
+.backup-check-warn {
+  color: var(--amber);
+}
+
+.backup-confirm {
+  display: grid;
+  gap: 10px;
+  max-width: 480px;
+}
+
+.backup-confirm label {
+  display: grid;
+  gap: 6px;
+  font-size: 0.86rem;
+}
+
+.backup-confirm input {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 10px 12px;
+  width: 100%;
+  font: inherit;
+}
+
+.backup-confirm input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.backup-confirm-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.tag-ok {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.tag-warn {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+@media (max-width: 700px) {
+  .backup-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .backup-panel {
+    padding: 16px 16px;
+  }
+
+  .backup-panel .panel-head {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  /* 窄屏放不下四列：时间戳已在文件名里，直接隐藏，保证「回滚」可见 */
+  .backup-panel .table-wrap {
+    overflow-x: visible;
+  }
+
+  .backup-panel table {
+    min-width: 0;
+  }
+
+  .backup-panel th:nth-child(3),
+  .backup-panel td:nth-child(3) {
+    display: none;
+  }
+
+  .backup-panel td code {
+    white-space: normal;
+    word-break: break-word;
+    font-size: 0.78rem;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

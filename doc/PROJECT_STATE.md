@@ -1,23 +1,42 @@
 # 项目状态 · 我的开发笔记
 
-> v1.4.10 · by Mr lin · 2026-11-27
+> v1.4.11 · by Mr lin · 2026-11-27
 
 ## 当前版本
 
-v1.4.10 · Section 3 已完成，Section 4 进行中：8 个项目共 31 篇，全部为真实技术复盘。数据库结构版本 `schemaVersion = 4`（`note` 含 `is_featured` 推荐字段）。Section 5 部署：Docker 构建链就绪，`1.4.8` / `1.4.9` / `1.4.10` 镜像均已推送阿里云；1Panel 上机待 ICP 备案通过。
+v1.4.11 · Section 3 已完成，Section 4 进行中：8 个项目共 31 篇，全部为真实技术复盘。数据库结构版本 `schemaVersion = 4`（`note` 含 `is_featured` 推荐字段）。Section 5 部署：Docker 构建链就绪，`1.4.8` / `1.4.9` / `1.4.10` / `1.4.11` 镜像均已推送阿里云；1Panel 上机待 ICP 备案通过。
 
-**当前 `app/build/dev-notes` 是 `bash scripts/build.sh` 产出的正式包**（v1.4.10，明文凭据计数 0，可对外发）：需要一键登录的本机验收包用 `scripts/build-test.sh` 单独产出（计数 1），用完覆盖回正式包，测试包不得外发。本机验收数据用 `deploy/data` 的副本（WSL 重启会清空 `/tmp`，原来的 `/tmp/dn-dev` 已不可靠）。
+**当前 `app/build/dev-notes` 是 `bash scripts/build.sh` 产出的正式包**（v1.4.11，明文凭据计数 0，可对外发）：需要一键登录的本机验收包用 `scripts/build-test.sh` 单独产出（计数 1），用完覆盖回正式包，测试包不得外发。本机验收数据用 `deploy/data` 的副本（WSL 重启会清空 `/tmp`，原来的 `/tmp/dn-dev` 已不可靠）。
 
-## 本轮改动记录（v1.4.10，2026-11-27）
+## 本轮改动记录（v1.4.11，2026-11-27）
+
+- 后台接入「数据备份」页面：新增 `web/src/views/admin/AdminBackupView.vue`、`/admin/backup` 路由与侧栏「数据备份」入口；`admin.ts` 增加概览、二进制下载、预检、恢复与快照回滚封装，`api.ts` 导出 `baseUrl` 供二进制下载复用。
+- 页面能力：统计卡（库大小、内容数、schema、图片占用、快照份数）、生成并下载 `.tar.gz`、拖拽上传自动预检、输入 `RESTORE` 才可恢复、恢复前快照列表与一键回滚、恢复后自检结果。
+- 交互保护：打包/预检/恢复期间显示不确定进度动画并禁用冲突按钮；回滚前二次确认；恢复完成后刷新概览与快照列表。
+- 修复上一版只做接口没做界面、后台点不到功能的问题（原 `prototype/backup.html` 仅原型）。
+- 修复窄屏（≤700px）快照表被压成逐字换行：隐藏时间列（时间已在文件名中），「回滚」按钮恢复 64×46，横向溢出 0。
+- 新增回归脚本 `test/backup_page_check.py`（完整链路）与 `test/backup_narrow_check.py`（390px 溢出与按钮尺寸）。
+
+### 验收证据（v1.4.11，2026-11-27）
+
+- `test/backup_page_check.py`：侧栏进入 `/admin/backup`，统计卡 3 张，标题「数据备份」；点「生成备份包」真实下载 `dev-notes-backup-20261126-1652.tar.gz`（221,446 字节）；重传该包显示「预检通过，可恢复」；输入 `RESTORE` 后显示「恢复完成 · 31 篇笔记 · 8 个项目 · 3 张图片 · schema v4」与快照 `pre-restore-20261126-165236.tar.gz`；控制台 0 报错。
+- `test/backup_narrow_check.py`（390×900）：`scrollWidth=390 / clientWidth=390`，统计卡单列 354px，「回滚」按钮 64×46，控制台 0 报错。
+- 打包：`bash scripts/build.sh` 通过五处版本校验，`vite build` 54.24s（110 模块），后端 `-tags embedui` 静态编译；正式包实跑 `/healthz` = `{"db":"ok","status":"ok","version":"1.4.11"}`，`/admin/backup` 200。
+- 测试：`go test ./...` 全绿（api / auth / backup / config / render / store / validate），`gofmt -l` 无输出，`go vet ./...` 通过。
+- 发包（2026-11-27）：`bash scripts/push-image.sh` RC=0，`1.4.11` 与 `latest` 推送阿里云，digest 同为 `sha256:9fa9f71c…`，manifest `application/vnd.oci.image.manifest.v1+json`（无 OCI 空 manifest）。
+- 镜像端到端：用推送的 `1.4.11` 起容器（`-p 18092:8080`，挂 `deploy/data` 副本并 `chown -R 100:101`），`Up (healthy)`，`/healthz` = `1.4.11`，`/admin/backup` 200。
+- 产物复测：在 v1.4.11 正式包上再跑 `backup_page_check.py`，下载 221,443 字节、预检通过、恢复后 31 篇 / 8 项目 / 3 图片、快照 `pre-restore-20261126-170541.tar.gz`。
+
+## 上一轮改动记录（v1.4.10，2026-11-27）
 
 - 新增备份/恢复后端能力：`internal/backup` 负责打包（数据库 + 媒体 + manifest + sha256）、解包预检与落盘替换；`internal/api/backup.go` 暴露概览、下载、预检、恢复、快照列表与快照回滚 6 个接口；`internal/store/backup.go` 提供内容统计、schema 版本与媒体引用查询。
 - 恢复流程内建安全网：`confirm=RESTORE` 二次确认、恢复前自动快照、任一步失败自动回滚、`maintenanceGuard` 在恢复期间拦截其余 API（503 + `Retry-After`），并发恢复用 `restoreMu` 拒绝第二个请求。
 - `Server` 的库句柄从固定指针改为可替换的 `storeRef`（`s.store` → `s.store()`），恢复后换连接、不重启进程。
 - 新增 `app/internal/api/backup_test.go`，为上述接口补齐 6 个端到端 HTTP 用例：未登录 401、缺 CSRF 403、概览与下载包预检、完整恢复链路（含恢复前快照与回滚）、坏包拒绝、非 `.tar.gz` 拒绝。
 - 修复新测试文件与 `api_admin_test.go` 重复声明 `itoa` 的编译冲突，改为复用既有函数。
-- 后台备份管理界面未接入正式前端，本版只留 `prototype/backup.html` 原型，接口先行。
+- 后台备份管理界面未接入正式前端，本版只留 `prototype/backup.html` 原型，接口先行（v1.4.11 已接入正式页面）。
 
-### 验收证据（v1.4.10，2026-11-27）
+### 上一轮验收证据（v1.4.10，2026-11-27）
 
 - `go test ./internal/api/ -run 'Backup|Restore' -v`：6 个用例全部 PASS，包耗时 5.337s。
 - `go test ./...`：`internal/api` 20.292s、`internal/backup` 4.228s、`internal/store` 9.391s，其余包全绿。
@@ -27,9 +46,7 @@ v1.4.10 · Section 3 已完成，Section 4 进行中：8 个项目共 31 篇，�
 - 发包（2026-11-27）：`bash scripts/push-image.sh` RC=0，`1.4.10` 与 `latest` 推送阿里云，digest 同为 `sha256:1e7ae6c2…`，manifest `application/vnd.oci.image.manifest.v1+json`（无 OCI 空 manifest）。
 - 镜像端到端：用推送的 `1.4.10` 起容器（`-p 18091:8080`，挂 `deploy/data` 副本并 `chown -R 100:101`），状态 `Up (healthy)`，`/healthz` 返回 `1.4.10`，`/api/notes` 正常返回已有数据。
 
-## 上一轮改动记录（v1.4.9，2026-11-26）
-
-## 本轮改动记录（v1.4.9，2026-11-26）
+## 历史改动记录（v1.4.9，2026-11-26）
 
 - 推荐改为笔记自身属性：`note` 加 `is_featured`（`schemaVersion` 3 → 4），后台新建/编辑页勾选「设为首页推荐」，后台列表状态后加「推荐」徽标。
 - 首页面板改为取「已发布 + 已推荐」按发布时间倒序的前 3 条；「全部」进入 `/notes?featured=1` 全量推荐列表，标题变「推荐笔记」，可用「仅看推荐 ✕」取消，筛选状态写进 URL。
@@ -663,7 +680,7 @@ v1.4.10 · Section 3 已完成，Section 4 进行中：8 个项目共 31 篇，�
 4. `mailhub-imap-cursor.svg` 仍未在任何文章中被引用（`siteguard-origin.svg` 已随 `reverse-proxy-origin-403` 上线）；本轮 3 篇纯文字，没有插图
 5. `tools/import-notes.sh` 目前只处理新建与更新，未做正文配图上传（插图仍走 `web/public/media/`）
 6. 项目元数据（名称/摘要/技术栈/说明/封面路径）只存在于数据库，重建开发库要手工补录；考虑加一份 `content/projects.json` + 入库脚本，避免下次重来
-7. Section 5：Docker 构建链已就绪，`1.4.6` / `1.4.7` / `1.4.8` / `1.4.9` / `1.4.10` 镜像均在阿里云，`1.4.10` 已通过本地容器冒烟。待办是 1Panel 上机部署与浏览器验收（需 ICP 备案通过后再开放）
+7. Section 5：Docker 构建链已就绪，`1.4.6` / `1.4.7` / `1.4.8` / `1.4.9` / `1.4.10` / `1.4.11` 镜像均在阿里云，`1.4.11` 已通过本地容器冒烟。待办是 1Panel 上机部署与浏览器验收（需 ICP 备案通过后再开放）
 8. 每个 Section 完成后升小版本、同步文档并提交
 
 ## 版本一致性检查
@@ -672,11 +689,11 @@ v1.4.10 · Section 3 已完成，Section 4 进行中：8 个项目共 31 篇，�
 
 | 位置 | 当前值 |
 |---|---|
-| `app/VERSION` / `app/main.go` | `1.4.10` |
-| `web/package.json` / `web/package-lock.json` | `1.4.10` |
-| `web/src/version.ts` | `APP_VERSION = '1.4.10'` |
-| `web/src/views/AboutView.vue` / 后台侧栏 / 登录页 | `{{ VERSION_LINE }}` → `v1.4.10 by Mr lin` |
-| `doc/*.md` / `README.md` / `CHANGELOG.md` / `deploy/docker-compose.yml` 镜像 tag | `v1.4.10` |
+| `app/VERSION` / `app/main.go` | `1.4.11` |
+| `web/package.json` / `web/package-lock.json` | `1.4.11` |
+| `web/src/version.ts` | `APP_VERSION = '1.4.11'` |
+| `web/src/views/AboutView.vue` / 后台侧栏 / 登录页 | `{{ VERSION_LINE }}` → `v1.4.11 by Mr lin` |
+| `doc/*.md` / `README.md` / `CHANGELOG.md` / `deploy/docker-compose.yml` 镜像 tag | `v1.4.11` |
 
 `scripts/build.sh` 在编译前校验 `app/main.go` 的 `var version` 与 `app/VERSION` 一致，不一致直接失败。原型工程 `prototype/` 仍为 `v1.0.3`，作为冻结基线不再跟随版本。
 

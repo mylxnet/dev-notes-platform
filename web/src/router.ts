@@ -14,6 +14,7 @@ import AdminProjectsView from './views/admin/AdminProjectsView.vue'
 import AdminProjectEditView from './views/admin/AdminProjectEditView.vue'
 import AdminAccountView from './views/admin/AdminAccountView.vue'
 import AdminSettingsView from './views/admin/AdminSettingsView.vue'
+import AdminBackupView from './views/admin/AdminBackupView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -37,7 +38,8 @@ const router = createRouter({
         { path: 'projects/new', name: 'admin-project-new', component: AdminProjectEditView },
         { path: 'projects/:id/edit', name: 'admin-project-edit', component: AdminProjectEditView },
         { path: 'account', name: 'admin-account', component: AdminAccountView },
-        { path: 'settings', name: 'admin-settings', component: AdminSettingsView }
+        { path: 'settings', name: 'admin-settings', component: AdminSettingsView },
+        { path: 'backup', name: 'admin-backup', component: AdminBackupView }
       ]
     },
     { path: '/:pathMatch(.*)*', redirect: '/' }

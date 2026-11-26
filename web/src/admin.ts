@@ -1,6 +1,7 @@
 // 管理端接口封装：统一注入 CSRF 头，并在 401 时通知路由跳转登录。
 import {
   ApiError,
+  baseUrl,
   requestJSON,
   type AdminSettings,
   type ContentStatus,
@@ -182,4 +183,119 @@ export function updateProject(id: number, input: ProjectInput): Promise<Project>
 
 export function deleteProject(id: number): Promise<{ ok: boolean }> {
   return adminRequest<{ ok: boolean }>(`/api/admin/projects/${id}`, { method: 'DELETE' })
+}
+
+/** 备份概览：库与媒体规模、内容数、schema 版本与已有快照。 */
+export interface BackupSummary {
+  db_bytes: number
+  media_files: number
+  media_bytes: number
+  notes: number
+  projects: number
+  schema_version: number
+  app_version: string
+  snapshots: BackupSnapshot[]
+  max_archive_bytes: number
+}
+
+/** 服务器上的恢复前快照。 */
+export interface BackupSnapshot {
+  name: string
+  bytes: number
+  mod_time: string
+}
+
+/** 备份包清单与预检结论。 */
+export interface BackupInspection {
+  restorable: boolean
+  manifest: {
+    format: string
+    app_version: string
+    schema_version: number
+    created_at: string
+    entries: { path: string; bytes: number; sha256: string }[]
+    counts: { notes: number; projects: number; media_files: number; media_bytes: number }
+  }
+  missing: string[]
+  problems: string[]
+  warnings: string[]
+}
+
+/** 恢复成功后的自检结果。 */
+export interface RestoreOutcome {
+  notes: number
+  projects: number
+  media_files: number
+  missing: string[]
+  snapshot: string
+  schema_version: number
+}
+
+export function fetchBackupSummary(): Promise<BackupSummary> {
+  return adminRequest<BackupSummary>('/api/admin/backup/summary')
+}
+
+/** 生成备份包并取回二进制；响应不是 JSON，不能走 requestJSON。 */
+export async function downloadBackupPackage(): Promise<{ blob: Blob; filename: string }> {
+  const headers: Record<string, string> = {}
+  if (csrfToken) headers['X-CSRF-Token'] = csrfToken
+
+  let response: Response
+  try {
+    response = await fetch(`${baseUrl}/api/admin/backup`, {
+      method: 'POST',
+      headers,
+      credentials: 'same-origin'
+    })
+  } catch {
+    throw new ApiError('网络连接失败，请稍后重试', 0, 'NETWORK_ERROR')
+  }
+
+  if (response.status === 401) {
+    csrfToken = ''
+    unauthorizedHandler?.()
+  }
+  if (!response.ok) {
+    const detail = (await response.json().catch(() => null)) as
+      | { error?: { message?: string; code?: string } }
+      | null
+    throw new ApiError(
+      detail?.error?.message ?? `生成备份失败（HTTP ${response.status}）`,
+      response.status,
+      detail?.error?.code ?? 'BACKUP_FAILED'
+    )
+  }
+
+  const disposition = response.headers.get('Content-Disposition') ?? ''
+  const matched = /filename="?([^";]+)"?/i.exec(disposition)
+  return { blob: await response.blob(), filename: matched?.[1]?.trim() ?? 'dev-notes-backup.tar.gz' }
+}
+
+function backupForm(file: File, confirm?: string): FormData {
+  const form = new FormData()
+  form.append('file', file)
+  if (confirm) form.append('confirm', confirm)
+  return form
+}
+
+/** 只预检，不改数据。 */
+export function inspectBackupPackage(file: File): Promise<BackupInspection> {
+  return adminRequest<BackupInspection>('/api/admin/backup/inspect', { method: 'POST', body: backupForm(file) })
+}
+
+export function restoreBackupPackage(file: File, confirm: string): Promise<RestoreOutcome> {
+  return adminRequest<RestoreOutcome>('/api/admin/backup/restore', {
+    method: 'POST',
+    body: backupForm(file, confirm)
+  })
+}
+
+export function listBackupSnapshots(): Promise<{ items: BackupSnapshot[] }> {
+  return adminRequest<{ items: BackupSnapshot[] }>('/api/admin/backup/snapshots')
+}
+
+export function restoreBackupSnapshot(name: string): Promise<RestoreOutcome> {
+  return adminRequest<RestoreOutcome>(`/api/admin/backup/snapshots/${encodeURIComponent(name)}/restore`, {
+    method: 'POST'
+  })
 }

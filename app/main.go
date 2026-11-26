@@ -16,7 +16,7 @@ import (
 	"dev-notes-platform/internal/store"
 )
 
-var version = "1.4.10"
+var version = "1.4.11"
 
 func main() {
 	if err := run(); err != nil {

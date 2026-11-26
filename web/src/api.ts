@@ -127,7 +127,7 @@ export class ApiError extends Error {
   }
 }
 
-const baseUrl = (import.meta.env.VITE_API_BASE ?? '').replace(/\/+$/, '')
+export const baseUrl = (import.meta.env.VITE_API_BASE ?? '').replace(/\/+$/, '')
 
 interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE'
